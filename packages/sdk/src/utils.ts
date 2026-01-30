@@ -79,7 +79,7 @@ export function parseIpfsUri(uri: string): string {
   }
   // Handle gateway URLs
   const match = uri.match(/\/ipfs\/([a-zA-Z0-9]+)/);
-  if (match) {
+  if (match && match[1]) {
     return match[1];
   }
   throw new Error(`Invalid IPFS URI: ${uri}`);

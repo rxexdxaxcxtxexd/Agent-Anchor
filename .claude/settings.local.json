@@ -13,7 +13,21 @@
       "WebFetch(domain:github.com)",
       "Bash(git fetch:*)",
       "Bash(powershell:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(pnpm install:*)",
+      "Bash(cmd /c \"where npm\")",
+      "Bash(cmd /c \"npm install -g pnpm\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main && pnpm install\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\contracts && npx hardhat compile\")",
+      "Bash(cmd /c \"dir C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\contracts\\\\hardhat*\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Phase 2 - Smart contract foundation\n\n- Add AgentAnchor.sol with full implementation:\n  - Granularity enum \\(Session, Task, Step\\)\n  - Anchor struct with all fields\n  - Storage mappings \\(anchors, agentAnchors, creatorAnchors\\)\n  - TraceAnchored event with indexed parameters\n  - anchorTrace\\(\\) and verifyTrace\\(\\) functions\n  - Query functions \\(getTracesByAgent, getTracesByCreator\\)\n  - Custom errors for validation\n- Fix ESM compatibility for Hardhat\n- Add pnpm-lock.yaml\n\nContract compiles successfully with Solidity 0.8.20\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git rebase:*)",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\contracts && npx hardhat test\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\contracts && npx hardhat coverage\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\sdk && npx tsc --noEmit\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\sdk && npx tsup\")"
     ]
   }
 }

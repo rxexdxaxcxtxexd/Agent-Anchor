@@ -14,6 +14,10 @@ export * from "./types.js";
 // Export utilities
 export * from "./utils.js";
 
+// Export IPFS client
+export { IpfsClient, createMockIpfsClient, ipfs } from "./ipfs.js";
+export type { IpfsConfig, IpfsUploadResult } from "./ipfs.js";
+
 // Export client
 export { AgentAnchorClient } from "./client.js";
 

@@ -20,6 +20,27 @@ import type {
   Granularity,
 } from "./types.js";
 import { hashTrace, validateTrace, stringToBytes32 } from "./utils.js";
+import { IpfsClient, createMockIpfsClient } from "./ipfs.js";
+
+/**
+ * Extended client options including IPFS configuration
+ */
+export interface ExtendedClientOptions extends ClientOptions {
+  /** IPFS API token for uploads */
+  ipfsApiToken?: string;
+  /** Use mock IPFS client (for testing) */
+  mockIpfs?: boolean;
+}
+
+/**
+ * Anchor options for customizing the anchor operation
+ */
+export interface AnchorOptions {
+  /** Skip IPFS upload and use provided URI */
+  ipfsUri?: string;
+  /** Dry run - estimate gas without submitting */
+  dryRun?: boolean;
+}
 
 /**
  * Client for interacting with Agent Anchor smart contracts
@@ -28,7 +49,8 @@ import { hashTrace, validateTrace, stringToBytes32 } from "./utils.js";
  * ```typescript
  * const client = new AgentAnchorClient({
  *   network: "base-testnet",
- *   privateKey: process.env.PRIVATE_KEY
+ *   privateKey: process.env.PRIVATE_KEY,
+ *   ipfsApiToken: process.env.WEB3_STORAGE_TOKEN
  * });
  *
  * const result = await client.anchorTrace(myTrace);
@@ -41,12 +63,13 @@ export class AgentAnchorClient {
   private readonly contract: Contract;
   private readonly signer?: Signer;
   private readonly ipfsGateway: string;
+  private readonly ipfsClient: IpfsClient;
 
   /**
    * Create a new AgentAnchorClient
    * @param options - Client configuration options
    */
-  constructor(options: ClientOptions = {}) {
+  constructor(options: ExtendedClientOptions = {}) {
     this.network = options.network || DEFAULT_NETWORK;
 
     const networkConfig = NETWORKS[this.network];
@@ -71,6 +94,16 @@ export class AgentAnchorClient {
     }
 
     this.ipfsGateway = options.ipfsGateway || DEFAULT_IPFS_GATEWAY;
+
+    // Set up IPFS client
+    if (options.mockIpfs) {
+      this.ipfsClient = createMockIpfsClient();
+    } else {
+      this.ipfsClient = new IpfsClient({
+        apiToken: options.ipfsApiToken,
+        gateway: this.ipfsGateway,
+      });
+    }
   }
 
   /**
@@ -79,10 +112,7 @@ export class AgentAnchorClient {
    * @param options - Optional anchor options
    * @returns Anchor result with transaction details
    */
-  async anchorTrace(
-    trace: AgentTrace,
-    options?: { dryRun?: boolean }
-  ): Promise<AnchorResult> {
+  async anchorTrace(trace: AgentTrace, options?: AnchorOptions): Promise<AnchorResult> {
     // Validate trace
     const validation = validateTrace(trace);
     if (!validation.valid) {
@@ -97,8 +127,14 @@ export class AgentAnchorClient {
     const traceHash = hashTrace(trace);
     const agentIdBytes32 = stringToBytes32(trace.agentId);
 
-    // TODO: Upload to IPFS (Phase 3)
-    const ipfsUri = "ipfs://placeholder";
+    // Upload to IPFS or use provided URI
+    let ipfsUri: string;
+    if (options?.ipfsUri) {
+      ipfsUri = options.ipfsUri;
+    } else {
+      const uploadResult = await this.ipfsClient.upload(trace);
+      ipfsUri = uploadResult.uri;
+    }
 
     if (options?.dryRun) {
       // Estimate gas without submitting
@@ -114,14 +150,13 @@ export class AgentAnchorClient {
     }
 
     // Submit transaction
-    const tx = await this.contract.anchorTrace(
-      traceHash,
-      ipfsUri,
-      agentIdBytes32,
-      trace.granularity
-    );
+    const anchorFn = this.contract.getFunction("anchorTrace");
+    const tx = await anchorFn(traceHash, ipfsUri, agentIdBytes32, trace.granularity);
 
     const receipt = await tx.wait();
+    if (!receipt) {
+      throw new Error("Transaction failed - no receipt received");
+    }
 
     return {
       success: true,
@@ -139,11 +174,9 @@ export class AgentAnchorClient {
    * @param options - Optional verify options
    * @returns Verification result
    */
-  async verifyTrace(
-    traceHash: string,
-    options?: { full?: boolean }
-  ): Promise<VerifyResult> {
-    const [exists, ipfsUri, creator, timestamp] = await this.contract.verifyTrace(traceHash);
+  async verifyTrace(traceHash: string, options?: { full?: boolean }): Promise<VerifyResult> {
+    const verifyFn = this.contract.getFunction("verifyTrace");
+    const [exists, ipfsUri, creator, timestamp] = await verifyFn(traceHash);
 
     if (!exists) {
       return { exists: false };
@@ -160,12 +193,25 @@ export class AgentAnchorClient {
     };
 
     if (options?.full) {
-      // TODO: Fetch from IPFS and verify hash (Phase 4)
-      return {
-        exists: true,
-        hashMatches: true, // Placeholder
-        anchor,
-      };
+      try {
+        // Fetch from IPFS and verify hash
+        const fetchedTrace = await this.ipfsClient.fetch<AgentTrace>(ipfsUri);
+        const recomputedHash = hashTrace(fetchedTrace);
+        const hashMatches = recomputedHash === traceHash;
+
+        return {
+          exists: true,
+          hashMatches,
+          anchor,
+        };
+      } catch (error) {
+        return {
+          exists: true,
+          hashMatches: false,
+          anchor,
+          error: `Failed to fetch/verify IPFS content: ${error}`,
+        };
+      }
     }
 
     return { exists: true, anchor };
@@ -178,8 +224,9 @@ export class AgentAnchorClient {
    */
   async getTracesByAgent(agentId: string): Promise<string[]> {
     const agentIdBytes32 = stringToBytes32(agentId);
-    const hashes = await this.contract.getTracesByAgent(agentIdBytes32);
-    return hashes.map((h: string) => h);
+    const getTracesFn = this.contract.getFunction("getTracesByAgent");
+    const hashes = await getTracesFn(agentIdBytes32);
+    return (hashes as string[]).map((h: string) => h);
   }
 
   /**
@@ -190,9 +237,10 @@ export class AgentAnchorClient {
   async estimateGas(trace: AgentTrace): Promise<GasEstimate> {
     const traceHash = hashTrace(trace);
     const agentIdBytes32 = stringToBytes32(trace.agentId);
-    const ipfsUri = "ipfs://placeholder";
+    const ipfsUri = "ipfs://QmEstimateGasPlaceholder";
 
-    const gasLimit = await this.contract.anchorTrace.estimateGas(
+    const anchorFn = this.contract.getFunction("anchorTrace");
+    const gasLimit = await anchorFn.estimateGas(
       traceHash,
       ipfsUri,
       agentIdBytes32,
@@ -212,6 +260,22 @@ export class AgentAnchorClient {
       totalCost,
       costInToken: `${costInToken} ${networkConfig.nativeCurrency.symbol}`,
     };
+  }
+
+  /**
+   * Fetch trace data from IPFS
+   * @param ipfsUri - IPFS URI to fetch
+   * @returns Trace data
+   */
+  async fetchTrace(ipfsUri: string): Promise<AgentTrace> {
+    return this.ipfsClient.fetch<AgentTrace>(ipfsUri);
+  }
+
+  /**
+   * Get the IPFS client for direct access
+   */
+  getIpfsClient(): IpfsClient {
+    return this.ipfsClient;
   }
 
   /**
