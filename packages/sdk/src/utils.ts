@@ -6,12 +6,31 @@ import { keccak256, toUtf8Bytes, hexlify, zeroPadValue } from "ethers";
 import type { AgentTrace, Granularity } from "./types.js";
 
 /**
+ * Recursively sort object keys for canonical JSON representation
+ */
+function sortObjectKeys(obj: unknown): unknown {
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sortObjectKeys);
+  }
+  const sorted: Record<string, unknown> = {};
+  const keys = Object.keys(obj as Record<string, unknown>).sort();
+  for (const key of keys) {
+    sorted[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
+  }
+  return sorted;
+}
+
+/**
  * Compute keccak256 hash of trace content
  * @param trace - The trace data to hash
  * @returns bytes32 hash string
  */
 export function hashTrace(trace: AgentTrace): string {
-  const canonical = JSON.stringify(trace, Object.keys(trace).sort());
+  // Deep sort all keys for canonical representation
+  const canonical = JSON.stringify(sortObjectKeys(trace));
   return keccak256(toUtf8Bytes(canonical));
 }
 
