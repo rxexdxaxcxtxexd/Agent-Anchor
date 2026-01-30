@@ -7,14 +7,20 @@ dist/
 build/
 out/
 .next/
-artifacts/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Hardhat
 cache/
+artifacts/
 typechain-types/
-coverage/
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 
@@ -22,24 +28,16 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
-.env.*.local
-
 # Logs
 *.log
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
 # Test coverage
+coverage/
 .nyc_output/
 
 # Misc
-*.tsbuildinfo
-.eslintcache
 *.tgz
 .turbo
-nul
