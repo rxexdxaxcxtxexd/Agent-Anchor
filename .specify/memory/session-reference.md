@@ -1,70 +1,27 @@
 # Agent Anchor - Session Reference Document
 
-**Created**: 2026-01-29
-**Project**: Agent Anchor MVP (On-Chain Trace Anchoring Protocol)
-**Branch**: 001-trace-anchoring-mvp
+**Updated**: 2026-01-29
+**Session**: MVP Complete + Strategic Analysis
+**Branch**: main
+**GitHub**: https://github.com/rxexdxaxcxtxexd/Agent-Anchor
 
 ---
 
-## Project Overview
+## Project Status: MVP COMPLETE
 
-Agent Anchor is an on-chain trace anchoring protocol that extends Cursor's Agent Trace specification with blockchain-based verification. It enables verifiable, tamper-proof records of AI agent actions on Polygon and Base blockchains.
+### Commits History
+| Commit | Phase | Description |
+|--------|-------|-------------|
+| `ebdf422` | - | Initial implementation plan (remote) |
+| `42f1958` | 1 | Project setup & monorepo |
+| `1fa1d1d` | 2 | Smart contract foundation |
+| `01e117f` | 3 | US1: Anchor a Trace |
+| `4cb7c4e` | 4 | US2: Verify a Trace |
 
-### Core Value Proposition
-- **Immutability**: Blockchain anchoring prevents trace tampering
-- **Verifiability**: Anyone can verify trace authenticity
-- **Decentralization**: IPFS storage + multi-chain support
-- **Developer-Friendly**: TypeScript SDK with CLI tools
-
----
-
-## Spec-Kit Setup (CRITICAL - Windows Fix)
-
-### Installation
-```bash
-uv tool install specify-cli
-```
-
-### Windows Encoding Fix
-**File**: `C:\Users\layden\AppData\Roaming\uv\tools\specify-cli\Lib\site-packages\specify_cli\__init__.py`
-
-**Fix 1** - Add after imports (~line 30):
-```python
-# Fix Windows console encoding for Unicode support
-if sys.platform == 'win32':
-    try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
-```
-
-**Fix 2** - Modify show_banner() (~line 444):
-```python
-def show_banner():
-    """Display the ASCII art banner."""
-    try:
-        banner_lines = BANNER.strip().split('\n')
-        colors = ["bright_blue", "blue", "cyan", "bright_cyan", "white", "bright_white"]
-        styled_banner = Text()
-        for i, line in enumerate(banner_lines):
-            color = colors[i % len(colors)]
-            styled_banner.append(line + "\n", style=color)
-        console.print(Align.center(styled_banner))
-        console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
-        console.print()
-    except (UnicodeEncodeError, UnicodeDecodeError, Exception) as e:
-        if "charmap" in str(e) or "encode" in str(e).lower():
-            print("\n  SPECIFY - GitHub Spec Kit")
-            print(f"  {TAGLINE}\n")
-        else:
-            raise
-```
-
-**Fix 3** - Change Console initialization (line 425):
-```python
-console = Console(force_terminal=True, legacy_windows=False)
-```
+### Test Coverage
+- **Contract tests**: 30 passing (100% coverage)
+- **SDK tests**: 38 passing
+- **Total**: 68 tests
 
 ---
 
@@ -72,12 +29,12 @@ console = Console(force_terminal=True, legacy_windows=False)
 
 | Component | Technology |
 |-----------|------------|
-| Smart Contracts | Solidity 0.8.20, Hardhat, OpenZeppelin |
+| Smart Contracts | Solidity 0.8.20, Hardhat, OpenZeppelin patterns |
 | SDK | TypeScript, ethers.js v6, tsup bundler |
 | CLI | Commander.js |
 | Testing | Vitest (SDK), Hardhat/Chai (contracts) |
-| IPFS | web3.storage |
-| Chains | Polygon Amoy, Base Sepolia (testnets) |
+| IPFS | web3.storage integration |
+| Chains | Polygon Amoy (80002), Base Sepolia (84532) |
 | Monorepo | pnpm workspaces |
 
 ---
@@ -86,66 +43,28 @@ console = Console(force_terminal=True, legacy_windows=False)
 
 ```
 agent-anchor/
+├── .github/workflows/ci.yml       # GitHub Actions CI
+├── .specify/memory/               # Spec-kit memory
+│   ├── constitution.md            # 5 core principles
+│   └── session-reference.md       # This file
 ├── packages/
-│   ├── contracts/           # Solidity smart contracts
-│   │   ├── contracts/
-│   │   │   └── AgentAnchor.sol
-│   │   ├── test/
+│   ├── contracts/
+│   │   ├── contracts/AgentAnchor.sol  # Main contract
+│   │   ├── test/                      # 30 tests
 │   │   └── hardhat.config.ts
-│   └── sdk/                 # TypeScript SDK + CLI
+│   └── sdk/
 │       ├── src/
-│       │   ├── client.ts
-│       │   ├── types.ts
-│       │   ├── ipfs.ts
-│       │   └── utils.ts
-│       ├── bin/cli.ts
-│       └── test/
-├── .specify/                # Spec-kit memory
-│   └── memory/
-│       ├── constitution.md
-│       └── session-reference.md (this file)
-└── pnpm-workspace.yaml
+│       │   ├── client.ts          # AgentAnchorClient
+│       │   ├── ipfs.ts            # IPFS upload/fetch
+│       │   ├── cli.ts             # CLI commands
+│       │   ├── types.ts           # TypeScript types
+│       │   ├── utils.ts           # Hash, validation
+│       │   └── constants.ts       # Network configs
+│       └── test/                  # 38 tests
+├── package.json
+├── pnpm-workspace.yaml
+└── tsconfig.base.json
 ```
-
----
-
-## Constitution Principles (5 Core)
-
-1. **Smart Contract Safety** (NON-NEGOTIABLE)
-   - 95%+ test coverage for critical paths
-   - OpenZeppelin patterns
-   - No unbounded loops, reentrancy, overflow
-
-2. **Test-First Development**
-   - TDD mandatory: Red-Green-Refactor
-   - Tests before implementation
-
-3. **Multi-Chain Portability**
-   - Polygon + Base support
-   - Externalized configuration
-   - No chain-specific opcodes
-
-4. **SDK Developer Experience**
-   - TypeScript-first with full types
-   - ESM + CJS bundles
-   - JSDoc on all public APIs
-
-5. **Observability & Auditability**
-   - Events for all state changes
-   - Configurable logging
-   - Dry-run mode support
-
----
-
-## User Stories
-
-| ID | Priority | Description |
-|----|----------|-------------|
-| US1 | P1 | Anchor trace to IPFS + blockchain |
-| US2 | P1 | Verify anchor authenticity |
-| US3 | P2 | Query traces by agent ID |
-| US4 | P2 | SDK programmatic integration |
-| US5 | P3 | Multi-chain deployment |
 
 ---
 
@@ -171,7 +90,7 @@ function verifyTrace(bytes32 traceHash) view returns (
 // Query by agent
 function getTracesByAgent(bytes32 agentId) view returns (bytes32[])
 
-// Event emitted on anchor
+// Event
 event TraceAnchored(
     bytes32 indexed traceHash,
     bytes32 indexed agentId,
@@ -181,30 +100,104 @@ event TraceAnchored(
 
 ---
 
-## Task Summary (80 Total)
+## CLI Commands
 
-| Phase | Tasks | Description |
-|-------|-------|-------------|
-| 1 | 7 | Setup (monorepo, tooling) |
-| 2 | 11 | Foundational (contract + SDK skeletons) |
-| 3 | 14 | US1: Anchor functionality |
-| 4 | 10 | US2: Verify functionality |
-| 5 | 9 | US3: Query functionality |
-| 6 | 8 | US4: SDK polish |
-| 7 | 9 | US5: Multi-chain |
-| 8 | 12 | Polish & documentation |
+```bash
+# Anchor a trace file
+agent-anchor anchor ./trace.json --network base-testnet
 
-**MVP = Phases 1-4 = 42 tasks**
+# Verify on-chain
+agent-anchor verify 0xabc... --network base-testnet --full
+
+# List by agent
+agent-anchor list --agent my-agent-id
+
+# Validate locally
+agent-anchor validate ./trace.json
+
+# Compute hash
+agent-anchor hash ./trace.json
+```
 
 ---
 
-## Success Criteria
+## Spec-Kit Windows Fix (CRITICAL)
 
-- Anchor operation: < 30 seconds
-- Verify operation: < 5 seconds
-- Gas cost: < $0.10 USD
-- SDK bundle: < 100KB gzipped
-- Test coverage: 95%+ critical paths
+**File**: `C:\Users\layden\AppData\Roaming\uv\tools\specify-cli\Lib\site-packages\specify_cli\__init__.py`
+
+Three fixes required for Windows:
+
+1. **UTF-8 encoding** (after imports):
+```python
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+```
+
+2. **show_banner() try/except** with fallback for Unicode errors
+
+3. **Console initialization**:
+```python
+console = Console(force_terminal=True, legacy_windows=False)
+```
+
+---
+
+## Strategic Analysis (2026-01-29)
+
+### Current Value Proposition Gap
+
+Agent Trace explicitly does NOT track code ownership. It tracks:
+- What model was used
+- Which lines were AI-touched
+
+It does NOT prove:
+- Who instructed the agent
+- Who approved the output
+- Legal ownership claims
+
+**Current state**: Blockchain adds immutability to data not structured for ownership claims.
+
+### Recommended Improvements
+
+#### Phase 1: Quick Wins (1-2 weeks)
+| Feature | Description |
+|---------|-------------|
+| Identity Binding | Cryptographic signature from human who initiated session |
+| Git Commit Linking | Store commit SHA + GPG signature with trace |
+| Declaration of Authorship | Explicit ownership claims in trace schema |
+| Contribution Percentage | Human vs AI contribution estimates |
+
+#### Phase 2: Features (2-4 weeks)
+| Feature | Description |
+|---------|-------------|
+| Delegation Registry | On-chain "Entity X authorizes Agent Y for Repo Z" |
+| Work Order NFTs | Auditable task assignments |
+| Multi-sig Approval | N-of-M signatures before anchoring |
+| Dispute Mechanism | Counter-claims within grace period |
+| License Compliance | Check against GPL/Apache dependencies |
+
+#### Phase 3: Enterprise-Ready (1-3 months)
+| Feature | Description |
+|---------|-------------|
+| Legal Template Integration | Smart contracts encoding CLAs |
+| EU AI Act Compliance | Regulatory reporting (Aug 2026 deadline) |
+| Enterprise SSO | Link wallets to corporate identities |
+| Audit Export | Compliance reports for legal/finance |
+| Cross-Repository Lineage | Track code movement between repos |
+
+### Core Problem to Solve
+
+Transform from: **"Did this trace exist at this time?"**
+
+To answering:
+1. "Who authorized this work?" → Identity + delegation
+2. "What was delivered?" → Git linking + content hash
+3. "Who has legal claim?" → Ownership declarations + disputes
+4. "Is this compliant?" → License checking + regulatory reporting
 
 ---
 
@@ -213,34 +206,43 @@ event TraceAnchored(
 | File | Path |
 |------|------|
 | Constitution | `.specify/memory/constitution.md` |
-| Specification | `C:\Users\layden\specs\001-trace-anchoring-mvp\spec.md` |
-| Plan | `C:\Users\layden\specs\001-trace-anchoring-mvp\plan.md` |
-| Tasks | `C:\Users\layden\specs\001-trace-anchoring-mvp\tasks.md` |
-| ABI | `C:\Users\layden\specs\001-trace-anchoring-mvp\contracts\AgentAnchor.abi.json` |
-| Quickstart | `C:\Users\layden\specs\001-trace-anchoring-mvp\quickstart.md` |
-| Data Model | `C:\Users\layden\specs\001-trace-anchoring-mvp\data-model.md` |
-| Research | `C:\Users\layden\specs\001-trace-anchoring-mvp\research.md` |
+| This Reference | `.specify/memory/session-reference.md` |
+| Main Contract | `packages/contracts/contracts/AgentAnchor.sol` |
+| SDK Client | `packages/sdk/src/client.ts` |
+| CLI | `packages/sdk/src/cli.ts` |
+| Contract Tests | `packages/contracts/test/` |
+| SDK Tests | `packages/sdk/test/` |
 
 ---
 
-## Next Steps
+## Specs Location (External)
 
-1. **Run /speckit.implement** to begin building Phase 1 tasks
-2. Start with T001: Create monorepo root with pnpm-workspace.yaml
-3. Follow TDD approach per constitution
-
----
-
-## Spec-Kit Commands Reference
-
-```bash
-specify constitution    # Define project principles
-specify specify         # Create formal specification
-specify plan           # Generate implementation plan
-specify tasks          # Generate task breakdown
-specify implement      # Begin implementation
-```
+Full specifications at: `C:\Users\layden\specs\001-trace-anchoring-mvp\`
+- `spec.md` - Full specification
+- `plan.md` - Implementation plan
+- `tasks.md` - 80 tasks (42 MVP)
+- `quickstart.md` - Getting started
+- `contracts/AgentAnchor.abi.json` - Contract ABI
 
 ---
 
-*This reference document ensures session continuity for the Agent Anchor project.*
+## Next Steps Options
+
+1. **Deploy to testnet** - Contract is ready for Polygon Amoy / Base Sepolia
+2. **Phase 5-8** - Continue with Query, SDK Polish, Multi-Chain, Documentation
+3. **Strategic pivot** - Implement Phase 1 ownership improvements
+4. **Both** - Deploy MVP, then iterate with ownership features
+
+---
+
+## Research Sources
+
+- [Cursor Agent Trace Spec](https://github.com/cursor/agent-trace)
+- [Stanford CodeX: Blockchain IP Tools](https://law.stanford.edu/2025/01/30/a-collaborative-effort-to-design-and-promote-blockchain-based-ip-tools-and-standards-for-rightful-generative-ai/)
+- [arXiv: Blockchain for AI Copyrights](https://arxiv.org/abs/2404.06077)
+- [AI Code Enterprise Adoption](https://getdx.com/blog/ai-code-enterprise-adoption/)
+- [Software Liability & AI Compliance](https://threatrix.io/blog/threatrix/software-liability-in-2025-ai-generated-code-compliance-regulatory-risks/)
+
+---
+
+*This reference ensures session continuity for the Agent Anchor project.*
