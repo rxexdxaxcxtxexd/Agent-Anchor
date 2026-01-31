@@ -1,5 +1,32 @@
 /**
  * SDK Constants
+ *
+ * DEPLOYMENT INSTRUCTIONS:
+ *
+ * To deploy the AgentAnchor contract to a new network:
+ *
+ * 1. Deploy the contract using Hardhat:
+ *    ```bash
+ *    cd packages/contracts
+ *    npx hardhat run scripts/deploy.ts --network <network-name>
+ *    ```
+ *
+ * 2. Update the contractAddress in NETWORKS below for the deployed network
+ *
+ * 3. For V2 features, also deploy AgentAnchorV2:
+ *    ```bash
+ *    npx hardhat run scripts/deployV2.ts --network <network-name>
+ *    ```
+ *
+ * 4. Update NETWORKS_V2 in constantsV2.ts with the V2 contract address
+ *
+ * 5. Verify the contract on block explorer:
+ *    ```bash
+ *    npx hardhat verify --network <network-name> <contract-address>
+ *    ```
+ *
+ * IMPORTANT: Contract addresses should be updated via PR after deployment,
+ * not dynamically at runtime (except for localhost testing).
  */
 
 import type { Network } from "./types.js";
@@ -121,9 +148,64 @@ export const AGENT_ANCHOR_ABI = [
   },
   {
     type: "function",
+    name: "getAnchor",
+    inputs: [{ name: "traceHash", type: "bytes32" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "traceHash", type: "bytes32" },
+          { name: "ipfsUri", type: "string" },
+          { name: "agentId", type: "bytes32" },
+          { name: "granularity", type: "uint8" },
+          { name: "creator", type: "address" },
+          { name: "timestamp", type: "uint256" },
+          { name: "blockNumber", type: "uint256" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "getTracesByAgent",
     inputs: [{ name: "agentId", type: "bytes32" }],
     outputs: [{ type: "bytes32[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTracesByCreator",
+    inputs: [{ name: "creator", type: "address" }],
+    outputs: [{ type: "bytes32[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTracesByAgentPaginated",
+    inputs: [
+      { name: "agentId", type: "bytes32" },
+      { name: "offset", type: "uint256" },
+      { name: "limit", type: "uint256" },
+    ],
+    outputs: [
+      { name: "traces", type: "bytes32[]" },
+      { name: "total", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTracesByCreatorPaginated",
+    inputs: [
+      { name: "creator", type: "address" },
+      { name: "offset", type: "uint256" },
+      { name: "limit", type: "uint256" },
+    ],
+    outputs: [
+      { name: "traces", type: "bytes32[]" },
+      { name: "total", type: "uint256" },
+    ],
     stateMutability: "view",
   },
   {

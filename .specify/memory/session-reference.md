@@ -1,27 +1,36 @@
 # Agent Anchor - Session Reference Document
 
-**Updated**: 2026-01-29
-**Session**: MVP Complete + Strategic Analysis
+**Updated**: 2026-01-30
+**Session**: MVP + Ownership Phase 1 Complete + Security Remediation Complete
 **Branch**: main
 **GitHub**: https://github.com/rxexdxaxcxtxexd/Agent-Anchor
 
 ---
 
-## Project Status: MVP COMPLETE
+## Project Status: OWNERSHIP PHASE 1 COMPLETE
 
-### Commits History
-| Commit | Phase | Description |
-|--------|-------|-------------|
-| `ebdf422` | - | Initial implementation plan (remote) |
-| `42f1958` | 1 | Project setup & monorepo |
-| `1fa1d1d` | 2 | Smart contract foundation |
-| `01e117f` | 3 | US1: Anchor a Trace |
-| `4cb7c4e` | 4 | US2: Verify a Trace |
+### Implementation Status
+
+| Spec | Status | Tasks | Tests |
+|------|--------|-------|-------|
+| 001-trace-anchoring-mvp | ✅ Complete | 42/42 | 68 |
+| 002-ownership-phase1 | ✅ Complete | 75/75 | 256 |
+| 003-security-remediation | ✅ Complete | 40/40 | 324 |
 
 ### Test Coverage
-- **Contract tests**: 30 passing (100% coverage)
-- **SDK tests**: 38 passing
-- **Total**: 68 tests
+- **Contract tests**: 133 passing
+- **SDK tests**: 191 passing
+- **Total**: 324 tests (100% pass rate)
+
+### Gas Costs (V2 Contract)
+
+| Function | Min | Max | Avg |
+|----------|-----|-----|-----|
+| anchorTrace | 223,515 | 319,849 | 277,045 |
+| bindIdentity | 59,471 | 59,495 | 59,493 |
+| setGitMetadata | 36,801 | 54,483 | 52,850 |
+| declareAuthorship | 51,589 | 51,613 | 51,608 |
+| setContribution | 34,976 | 64,341 | 48,996 |
 
 ---
 
@@ -217,6 +226,7 @@ To answering:
 
 ## Specs Location (External)
 
+### MVP Specification (COMPLETE)
 Full specifications at: `C:\Users\layden\specs\001-trace-anchoring-mvp\`
 - `spec.md` - Full specification
 - `plan.md` - Implementation plan
@@ -224,14 +234,67 @@ Full specifications at: `C:\Users\layden\specs\001-trace-anchoring-mvp\`
 - `quickstart.md` - Getting started
 - `contracts/AgentAnchor.abi.json` - Contract ABI
 
+### Ownership Phase 1 Specification (PLANNED)
+Full specifications at: `C:\Users\layden\specs\002-ownership-phase1\`
+- `spec.md` - 4 user stories (Identity, Git, Authorship, Contribution)
+- `plan.md` - Technical implementation plan with architecture decisions
+- `data-model.md` - Struct definitions, storage layout, EIP-712 types
+- `tasks.md` - 75 tasks across 7 phases
+- `quickstart.md` - Usage examples for all ownership features
+- `research.md` - EIP-712 patterns, gas optimization, legal considerations
+- `contracts/AgentAnchorV2.abi.json` - V2 contract ABI
+- `checklists/requirements.md` - Functional & non-functional requirements
+
+### Security Remediation Specification (CRITICAL - Before Mainnet)
+Full specifications at: `C:\Users\layden\specs\003-security-remediation\`
+- `spec.md` - 5 security findings + 5 quality issues with fixes
+- `tasks.md` - 40 tasks across 4 phases
+
+---
+
+## Ownership Phase 1 Summary
+
+**Status**: ✅ COMPLETE (All 75 tasks implemented)
+**Contract**: AgentAnchorV2.sol (new, V1 unchanged)
+**Location**: `packages/contracts/contracts/AgentAnchorV2.sol`
+
+### User Stories - All Implemented
+| Story | Priority | Status | Description |
+|-------|----------|--------|-------------|
+| US1 | P1 | ✅ | Identity Binding - EIP-712 signatures for session initiator |
+| US2 | P2 | ✅ | Git Commit Linking - Connect traces to git commits |
+| US3 | P2 | ✅ | Declaration of Authorship - Legal ownership claims |
+| US4 | P3 | ✅ | Contribution Percentage - Human vs AI ratio tracking |
+
+### Phases Completed
+| Phase | Description | Tasks |
+|-------|-------------|-------|
+| 1 | Setup (interfaces, types) | T001-T008 ✅ |
+| 2 | Identity Binding (US1) | T009-T022 ✅ |
+| 3 | Git Commit Linking (US2) | T023-T034 ✅ |
+| 4 | Authorship (US3) | T035-T045 ✅ |
+| 5 | Contribution (US4) | T046-T057 ✅ |
+| 6 | Integration | T058-T066 ✅ |
+| 7 | Polish & Documentation | T067-T075 ✅ |
+
+### Key Files Added
+- `packages/contracts/contracts/AgentAnchorV2.sol` - V2 contract
+- `packages/contracts/contracts/libraries/OwnershipTypes.sol` - Packed structs
+- `packages/contracts/contracts/interfaces/I*.sol` - 4 interfaces
+- `packages/sdk/src/clientV2.ts` - V2 SDK client
+- `packages/sdk/src/identity.ts` - EIP-712 signing
+- `packages/sdk/src/git.ts` - Git metadata extraction
+- `packages/sdk/src/authorship.ts` - Authorship helpers
+- `packages/sdk/src/contribution.ts` - Contribution validation
+
 ---
 
 ## Next Steps Options
 
-1. **Deploy to testnet** - Contract is ready for Polygon Amoy / Base Sepolia
-2. **Phase 5-8** - Continue with Query, SDK Polish, Multi-Chain, Documentation
-3. **Strategic pivot** - Implement Phase 1 ownership improvements
-4. **Both** - Deploy MVP, then iterate with ownership features
+1. **Deploy MVP to testnet** - V1 contract ready for Polygon Amoy / Base Sepolia
+2. **Implement Ownership Phase 1** - Start with US1 (Identity Binding) for quick win
+3. **Both** - Deploy MVP, then add V2 contract with ownership features
+4. **Continue MVP polish** - Phases 5-8 (Query, SDK Polish, Multi-Chain, Docs)
 
 ---
 
@@ -242,6 +305,36 @@ Full specifications at: `C:\Users\layden\specs\001-trace-anchoring-mvp\`
 - [arXiv: Blockchain for AI Copyrights](https://arxiv.org/abs/2404.06077)
 - [AI Code Enterprise Adoption](https://getdx.com/blog/ai-code-enterprise-adoption/)
 - [Software Liability & AI Compliance](https://threatrix.io/blog/threatrix/software-liability-in-2025-ai-generated-code-compliance-regulatory-risks/)
+
+---
+
+## Security Review Findings (2026-01-30)
+
+### All Issues Resolved ✅
+
+| ID | Finding | Severity | Fix | Status |
+|----|---------|----------|-----|--------|
+| SEC-001 | Unbounded `ipfsUri` string storage | High | `MAX_IPFS_URI_LENGTH = 256` | ✅ Fixed |
+| SEC-002 | Unbounded arrays in getTracesByAgent/Creator | Medium | Paginated functions added | ✅ Fixed |
+| SEC-003 | No access control on anchorTrace | Medium | Documented permissionless design | ✅ Fixed |
+| SEC-004 | IPFS upload/fetch lacks size limits | Medium | `MAX_UPLOAD_SIZE`, `MAX_FETCH_SIZE` | ✅ Fixed |
+| SEC-005 | CID parsing overly permissive | Low | `isValidCid()` with regex | ✅ Fixed |
+
+### Quality Issues Resolved ✅
+
+| ID | Finding | Fix | Status |
+|----|---------|-----|--------|
+| QA-001 | verifyTrace returns placeholder fields | Added `getAnchor()` call | ✅ Fixed |
+| QA-002 | CLI --creator flag not implemented | Implemented in V2 CLI | ✅ Fixed |
+| QA-003 | Empty contract addresses in config | Deployment instructions added | ✅ Fixed |
+| QA-004 | Shallow input validation in validateTrace | Timestamp/content validation | ✅ Fixed |
+| QA-005 | hashTrace breaks with non-JSON types | JSDoc documentation | ✅ Fixed |
+
+### Security Documentation Added
+- `SECURITY.md` - Security policy and known limitations
+- `packages/sdk/README.md` - Security considerations section
+- `packages/contracts/contracts/AgentAnchor.sol` - Enhanced NatSpec for SEC-003
+- `specs/002-ownership-phase1/checklists/security.md` - Security checklist (39/39 pass)
 
 ---
 

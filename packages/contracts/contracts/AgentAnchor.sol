@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
  * @title AgentAnchor
  * @author Agent Anchor Team
  * @notice On-chain trace anchoring for AI agent verification
  * @dev Stores trace hashes and IPFS URIs for verifiable AI agent actions
  */
-contract AgentAnchor {
+contract AgentAnchor is Ownable {
     // ============ Enums ============
 
     /**
@@ -56,6 +58,15 @@ contract AgentAnchor {
     /// @notice Total number of anchors created
     uint256 public totalAnchors;
 
+    /// @notice Maximum length for IPFS URI (256 bytes)
+    uint256 public constant MAX_IPFS_URI_LENGTH = 256;
+
+    /// @notice Whether anchoring is permissionless (default: true)
+    bool public permissionless = true;
+
+    /// @notice Allowlist for restricted mode
+    mapping(address => bool) public allowlist;
+
     // ============ Events ============
 
     /**
@@ -76,6 +87,12 @@ contract AgentAnchor {
         uint256 timestamp
     );
 
+    /// @notice Emitted when permissionless mode is changed
+    event PermissionlessChanged(bool newValue);
+
+    /// @notice Emitted when an address is added/removed from allowlist
+    event AllowlistUpdated(address indexed account, bool allowed);
+
     // ============ Errors ============
 
     /// @notice Thrown when trace hash is zero
@@ -93,12 +110,42 @@ contract AgentAnchor {
     /// @notice Thrown when anchor does not exist
     error AnchorNotFound(bytes32 traceHash);
 
+    /// @notice Thrown when IPFS URI exceeds maximum length
+    error IpfsUriTooLong(uint256 length, uint256 maxLength);
+
+    /// @notice Thrown when caller is not allowed in restricted mode
+    error NotAllowed(address caller);
+
+    // ============ Constructor ============
+
+    constructor() Ownable(msg.sender) {}
+
     // ============ External Functions ============
 
     /**
      * @notice Anchor a trace to the blockchain
+     * @dev SECURITY CONSIDERATIONS (SEC-003):
+     *
+     * This function is permissionless by default, meaning anyone can anchor traces.
+     * This design choice enables:
+     * - Decentralized trace submission without gatekeepers
+     * - Lower barrier to entry for agent developers
+     * - Censorship-resistant trace recording
+     *
+     * IMPORTANT: Permissionless anchoring means:
+     * - Anyone can anchor traces claiming any agentId (no on-chain verification of agent identity)
+     * - The creator address only proves WHO submitted the trace, not that they control the agent
+     * - Off-chain verification is required to validate trace authenticity
+     * - Consider using V2 identity binding (EIP-712 signatures) for stronger attribution
+     *
+     * For restricted deployments, the owner can:
+     * - Call setPermissionless(false) to enable allowlist mode
+     * - Use setAllowlist() to control who can anchor traces
+     *
+     * Gas optimization: ~85,000 gas for first anchor per agent/creator, ~65,000 for subsequent
+     *
      * @param traceHash Keccak256 hash of the trace content
-     * @param ipfsUri IPFS URI where full trace is stored
+     * @param ipfsUri IPFS URI where full trace is stored (max 256 bytes, SEC-001)
      * @param agentId Identifier of the agent
      * @param granularity Granularity level of the trace
      * @return success True if anchoring succeeded
@@ -109,9 +156,17 @@ contract AgentAnchor {
         bytes32 agentId,
         Granularity granularity
     ) external returns (bool success) {
+        // Access control check (SEC-003)
+        if (!permissionless && !allowlist[msg.sender]) {
+            revert NotAllowed(msg.sender);
+        }
+
         // Input validation
         if (traceHash == bytes32(0)) revert InvalidTraceHash();
         if (bytes(ipfsUri).length == 0) revert InvalidIpfsUri();
+        if (bytes(ipfsUri).length > MAX_IPFS_URI_LENGTH) {
+            revert IpfsUriTooLong(bytes(ipfsUri).length, MAX_IPFS_URI_LENGTH);
+        }
         if (agentId == bytes32(0)) revert InvalidAgentId();
 
         // Check for duplicate
@@ -200,6 +255,7 @@ contract AgentAnchor {
      * @notice Get all trace hashes for an agent
      * @param agentId The agent identifier
      * @return hashes Array of trace hashes
+     * @dev DEPRECATED: Use getTracesByAgentPaginated for large datasets
      */
     function getTracesByAgent(bytes32 agentId) external view returns (bytes32[] memory hashes) {
         return agentAnchors[agentId];
@@ -209,9 +265,70 @@ contract AgentAnchor {
      * @notice Get all trace hashes for a creator
      * @param creator The creator address
      * @return hashes Array of trace hashes
+     * @dev DEPRECATED: Use getTracesByCreatorPaginated for large datasets
      */
     function getTracesByCreator(address creator) external view returns (bytes32[] memory hashes) {
         return creatorAnchors[creator];
+    }
+
+    /**
+     * @notice Get paginated trace hashes for an agent
+     * @param agentId The agent identifier
+     * @param offset Starting index in the array
+     * @param limit Maximum number of items to return
+     * @return traces Array of trace hashes for the requested page
+     * @return total Total number of traces for this agent
+     */
+    function getTracesByAgentPaginated(
+        bytes32 agentId,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory traces, uint256 total) {
+        bytes32[] storage allTraces = agentAnchors[agentId];
+        total = allTraces.length;
+
+        if (offset >= total) {
+            return (new bytes32[](0), total);
+        }
+
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        uint256 resultLength = end - offset;
+
+        traces = new bytes32[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            traces[i] = allTraces[offset + i];
+        }
+    }
+
+    /**
+     * @notice Get paginated trace hashes for a creator
+     * @param creator The creator address
+     * @param offset Starting index in the array
+     * @param limit Maximum number of items to return
+     * @return traces Array of trace hashes for the requested page
+     * @return total Total number of traces for this creator
+     */
+    function getTracesByCreatorPaginated(
+        address creator,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory traces, uint256 total) {
+        bytes32[] storage allTraces = creatorAnchors[creator];
+        total = allTraces.length;
+
+        if (offset >= total) {
+            return (new bytes32[](0), total);
+        }
+
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        uint256 resultLength = end - offset;
+
+        traces = new bytes32[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            traces[i] = allTraces[offset + i];
+        }
     }
 
     /**
@@ -230,5 +347,38 @@ contract AgentAnchor {
      */
     function getCreatorTraceCount(address creator) external view returns (uint256 count) {
         return creatorAnchors[creator].length;
+    }
+
+    // ============ Admin Functions ============
+
+    /**
+     * @notice Set permissionless mode
+     * @param _permissionless Whether anchoring is open to all (true) or restricted (false)
+     */
+    function setPermissionless(bool _permissionless) external onlyOwner {
+        permissionless = _permissionless;
+        emit PermissionlessChanged(_permissionless);
+    }
+
+    /**
+     * @notice Add or remove an address from the allowlist
+     * @param account The address to update
+     * @param allowed Whether the address is allowed
+     */
+    function setAllowlist(address account, bool allowed) external onlyOwner {
+        allowlist[account] = allowed;
+        emit AllowlistUpdated(account, allowed);
+    }
+
+    /**
+     * @notice Batch update allowlist
+     * @param accounts Array of addresses to update
+     * @param allowed Whether the addresses are allowed
+     */
+    function setAllowlistBatch(address[] calldata accounts, bool allowed) external onlyOwner {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            allowlist[accounts[i]] = allowed;
+            emit AllowlistUpdated(accounts[i], allowed);
+        }
     }
 }

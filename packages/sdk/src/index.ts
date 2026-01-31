@@ -21,5 +21,66 @@ export type { IpfsConfig, IpfsUploadResult } from "./ipfs.js";
 // Export client
 export { AgentAnchorClient } from "./client.js";
 
+// Export V2 client
+export { AgentAnchorClientV2 } from "./clientV2.js";
+export type {
+  ExtendedClientOptionsV2,
+  BindIdentityResult,
+  SetGitMetadataResult,
+  DeclareAuthorshipResult,
+  SetContributionResult,
+} from "./clientV2.js";
+
+// Export identity utilities
+export {
+  createIdentitySignature,
+  verifyIdentitySignature,
+  isValidIdentitySignature,
+} from "./identity.js";
+export type {
+  IdentitySignatureParams,
+  IdentitySignatureResult,
+} from "./identity.js";
+
+// Export git utilities
+export {
+  commitShaToBytes32,
+  bytes32ToCommitSha,
+  extractGitMetadata,
+  createGitMetadata,
+  isValidGitSha,
+} from "./git.js";
+export type {
+  ExtractedGitMetadata,
+  ExtractGitOptions,
+} from "./git.js";
+
+// Export authorship utilities
+export {
+  getDeclarationTypeLabel,
+  getDeclarationTypeDescription,
+  parseDeclarationType,
+  validateAuthorshipClaim,
+  createAuthorshipClaim,
+  formatAuthorshipClaim,
+  canClaimAuthorship,
+} from "./authorship.js";
+
+// Export contribution utilities
+export {
+  validateContribution,
+  createContributionRatio,
+  fromAiPercent,
+  fromHumanPercent,
+  formatContribution,
+  getContributionDescription,
+  parseContribution,
+  CONTRIBUTION_PRESETS,
+} from "./contribution.js";
+export type { CalculationMethod } from "./contribution.js";
+
 // Export constants
 export * from "./constants.js";
+
+// Export V2 constants
+export * from "./constantsV2.js";

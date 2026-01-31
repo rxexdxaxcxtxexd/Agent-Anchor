@@ -122,3 +122,160 @@ export interface GasEstimate {
   /** Estimated cost in native token */
   costInToken: string;
 }
+
+// ============ V2 Types - Ownership Layer ============
+
+/**
+ * Declaration type for authorship claims
+ */
+export enum DeclarationType {
+  /** Personal claim - individual authored the code */
+  Individual = 0,
+  /** Company/team claim - organization owns the code */
+  Organization = 1,
+  /** Employer owns the work - work-for-hire arrangement */
+  WorkForHire = 2,
+}
+
+/**
+ * Identity binding information
+ */
+export interface IdentityBinding {
+  /** Verified signer address */
+  signer: string;
+  /** Unix timestamp when identity was bound */
+  bindingTimestamp: number;
+  /** Signature type (0=EIP712, 1=EIP191) */
+  signatureType: number;
+  /** Whether the signature has been verified */
+  verified: boolean;
+}
+
+/**
+ * Git metadata for a trace
+ */
+export interface GitMetadata {
+  /** Git commit SHA (bytes32 hex) */
+  commitSha: string;
+  /** Branch name */
+  branch?: string;
+  /** Repository identifier/URL */
+  repository?: string;
+  /** Optional GPG signature */
+  gpgSignature?: string;
+  /** Git commit timestamp */
+  commitTimestamp?: number;
+}
+
+/**
+ * Authorship claim
+ */
+export interface AuthorshipClaim {
+  /** Address of the claimant */
+  claimant: string;
+  /** Type of authorship declaration */
+  declarationType: DeclarationType;
+  /** Unix timestamp when claim was made */
+  claimTimestamp: number;
+  /** Optional organization identifier */
+  organizationId?: string;
+}
+
+/**
+ * Contribution ratio between human and AI
+ */
+export interface ContributionRatio {
+  /** Percentage of human contribution (0-100) */
+  humanPercent: number;
+  /** Percentage of AI contribution (0-100) */
+  aiPercent: number;
+  /** Optional notes explaining the calculation */
+  notes?: string;
+  /** How the ratio was determined */
+  calculationMethod?: string;
+}
+
+/**
+ * Complete ownership record combining all V2 features
+ */
+export interface OwnershipRecord {
+  /** Trace hash */
+  traceHash: string;
+  /** Original trace creator address */
+  creator: string;
+  /** When the anchor was created */
+  anchorTimestamp: number;
+  /** Identity signer address */
+  identitySigner: string;
+  /** Whether identity is verified */
+  identityVerified: boolean;
+  /** Authorship claimant address */
+  claimant: string;
+  /** Type of authorship declaration */
+  declarationType: DeclarationType;
+  /** Human contribution percentage */
+  humanPercent: number;
+  /** AI contribution percentage */
+  aiPercent: number;
+  /** Git commit SHA */
+  commitSha: string;
+  /** Whether identity binding exists */
+  hasIdentity: boolean;
+  /** Whether ownership claim exists */
+  hasOwnership: boolean;
+  /** Whether git metadata exists */
+  hasGitMetadata: boolean;
+}
+
+/**
+ * Extended trace with ownership data
+ */
+export interface AgentTraceV2 extends AgentTrace {
+  /** Optional ownership information */
+  ownership?: {
+    identity?: IdentityBinding;
+    authorship?: AuthorshipClaim;
+    contribution?: ContributionRatio;
+    git?: GitMetadata;
+  };
+}
+
+/**
+ * Options for V2 anchoring with ownership features
+ */
+export interface AnchorOptionsV2 {
+  /** Skip IPFS upload and use provided URI */
+  ipfsUri?: string;
+  /** Dry run - estimate gas without submitting */
+  dryRun?: boolean;
+  /** Identity binding options */
+  identity?: {
+    /** Purpose of the signature */
+    purpose?: "code-authorship" | "audit-trail" | "compliance";
+  };
+  /** Authorship declaration options */
+  authorship?: {
+    /** Type of declaration */
+    declarationType: DeclarationType;
+    /** Optional organization identifier */
+    organizationId?: string;
+  };
+  /** Contribution tracking options */
+  contribution?: {
+    /** Human contribution percentage (0-100) */
+    humanPercent: number;
+    /** AI contribution percentage (0-100) */
+    aiPercent: number;
+    /** Optional notes */
+    notes?: string;
+  };
+  /** Git metadata options */
+  git?: {
+    /** Commit SHA (auto-detect if not provided) */
+    commitSha?: string;
+    /** Branch name */
+    branch?: string;
+    /** Repository identifier */
+    repository?: string;
+  };
+}

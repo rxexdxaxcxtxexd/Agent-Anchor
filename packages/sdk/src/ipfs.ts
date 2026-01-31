@@ -9,6 +9,13 @@ import { DEFAULT_IPFS_GATEWAY } from "./constants.js";
 import { retryWithBackoff } from "./utils.js";
 
 /**
+ * Security limits for IPFS operations
+ */
+export const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
+export const MAX_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
+export const FETCH_TIMEOUT = 30000; // 30 seconds
+
+/**
  * IPFS client configuration
  */
 export interface IpfsConfig {
@@ -50,6 +57,7 @@ export class IpfsClient {
    * Upload JSON data to IPFS
    * @param data - Data to upload (will be JSON stringified)
    * @returns Upload result with CID and URI
+   * @throws Error if data exceeds MAX_UPLOAD_SIZE
    */
   async upload(data: unknown): Promise<IpfsUploadResult> {
     if (!this.apiToken) {
@@ -59,6 +67,14 @@ export class IpfsClient {
     }
 
     const jsonData = JSON.stringify(data, null, 2);
+
+    // SEC-004: Enforce upload size limit
+    if (jsonData.length > MAX_UPLOAD_SIZE) {
+      throw new Error(
+        `Trace too large: ${jsonData.length} bytes (max: ${MAX_UPLOAD_SIZE})`
+      );
+    }
+
     const blob = new Blob([jsonData], { type: "application/json" });
 
     const response = await retryWithBackoff(async () => {
@@ -93,11 +109,19 @@ export class IpfsClient {
    * @param data - Raw data buffer
    * @param filename - Optional filename
    * @returns Upload result with CID and URI
+   * @throws Error if data exceeds MAX_UPLOAD_SIZE
    */
   async uploadRaw(data: Uint8Array, filename?: string): Promise<IpfsUploadResult> {
     if (!this.apiToken) {
       throw new Error(
         "IPFS API token required. Set WEB3_STORAGE_TOKEN env var or pass apiToken in config."
+      );
+    }
+
+    // SEC-004: Enforce upload size limit
+    if (data.length > MAX_UPLOAD_SIZE) {
+      throw new Error(
+        `Data too large: ${data.length} bytes (max: ${MAX_UPLOAD_SIZE})`
       );
     }
 
@@ -134,19 +158,36 @@ export class IpfsClient {
    * Fetch data from IPFS
    * @param cidOrUri - IPFS CID or URI
    * @returns Fetched data as JSON
+   * @throws Error if content exceeds MAX_FETCH_SIZE or times out
    */
   async fetch<T = unknown>(cidOrUri: string): Promise<T> {
     const cid = this.parseCid(cidOrUri);
     const url = `${this.gateway}${cid}`;
 
     const response = await retryWithBackoff(async () => {
-      const res = await fetch(url);
+      // SEC-004: Add timeout via AbortController
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-      if (!res.ok) {
-        throw new Error(`IPFS fetch failed: ${res.status}`);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+
+        if (!res.ok) {
+          throw new Error(`IPFS fetch failed: ${res.status}`);
+        }
+
+        // SEC-004: Check content-length header if available
+        const contentLength = res.headers.get("content-length");
+        if (contentLength && parseInt(contentLength, 10) > MAX_FETCH_SIZE) {
+          throw new Error(
+            `Content too large: ${contentLength} bytes (max: ${MAX_FETCH_SIZE})`
+          );
+        }
+
+        return res.json();
+      } finally {
+        clearTimeout(timeout);
       }
-
-      return res.json();
     });
 
     return response as T;
@@ -156,19 +197,36 @@ export class IpfsClient {
    * Fetch raw data from IPFS
    * @param cidOrUri - IPFS CID or URI
    * @returns Fetched data as ArrayBuffer
+   * @throws Error if content exceeds MAX_FETCH_SIZE or times out
    */
   async fetchRaw(cidOrUri: string): Promise<ArrayBuffer> {
     const cid = this.parseCid(cidOrUri);
     const url = `${this.gateway}${cid}`;
 
     const response = await retryWithBackoff(async () => {
-      const res = await fetch(url);
+      // SEC-004: Add timeout via AbortController
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-      if (!res.ok) {
-        throw new Error(`IPFS fetch failed: ${res.status}`);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+
+        if (!res.ok) {
+          throw new Error(`IPFS fetch failed: ${res.status}`);
+        }
+
+        // SEC-004: Check content-length header if available
+        const contentLength = res.headers.get("content-length");
+        if (contentLength && parseInt(contentLength, 10) > MAX_FETCH_SIZE) {
+          throw new Error(
+            `Content too large: ${contentLength} bytes (max: ${MAX_FETCH_SIZE})`
+          );
+        }
+
+        return res.arrayBuffer();
+      } finally {
+        clearTimeout(timeout);
       }
-
-      return res.arrayBuffer();
     });
 
     return response;

@@ -175,27 +175,32 @@ export class AgentAnchorClient {
    * @returns Verification result
    */
   async verifyTrace(traceHash: string, options?: { full?: boolean }): Promise<VerifyResult> {
+    // First check if it exists using verifyTrace
     const verifyFn = this.contract.getFunction("verifyTrace");
-    const [exists, ipfsUri, creator, timestamp] = await verifyFn(traceHash);
+    const [exists] = await verifyFn(traceHash);
 
     if (!exists) {
       return { exists: false };
     }
 
+    // Use getAnchor for complete data (QA-001 fix)
+    const getAnchorFn = this.contract.getFunction("getAnchor");
+    const anchorData = await getAnchorFn(traceHash);
+
     const anchor: Anchor = {
-      traceHash,
-      ipfsUri,
-      agentId: "", // Would need additional query
-      granularity: 0 as Granularity, // Would need additional query
-      creator,
-      timestamp: Number(timestamp),
-      blockNumber: 0, // Would need to query from events
+      traceHash: anchorData.traceHash,
+      ipfsUri: anchorData.ipfsUri,
+      agentId: anchorData.agentId,
+      granularity: Number(anchorData.granularity) as Granularity,
+      creator: anchorData.creator,
+      timestamp: Number(anchorData.timestamp),
+      blockNumber: Number(anchorData.blockNumber),
     };
 
     if (options?.full) {
       try {
         // Fetch from IPFS and verify hash
-        const fetchedTrace = await this.ipfsClient.fetch<AgentTrace>(ipfsUri);
+        const fetchedTrace = await this.ipfsClient.fetch<AgentTrace>(anchor.ipfsUri);
         const recomputedHash = hashTrace(fetchedTrace);
         const hashMatches = recomputedHash === traceHash;
 
@@ -221,12 +226,66 @@ export class AgentAnchorClient {
    * Get traces by agent ID
    * @param agentId - The agent identifier
    * @returns Array of trace hashes
+   * @deprecated Use getTracesByAgentPaginated for large datasets
    */
   async getTracesByAgent(agentId: string): Promise<string[]> {
     const agentIdBytes32 = stringToBytes32(agentId);
     const getTracesFn = this.contract.getFunction("getTracesByAgent");
     const hashes = await getTracesFn(agentIdBytes32);
     return (hashes as string[]).map((h: string) => h);
+  }
+
+  /**
+   * Get traces by creator address
+   * @param creator - The creator address
+   * @returns Array of trace hashes
+   * @deprecated Use getTracesByCreatorPaginated for large datasets
+   */
+  async getTracesByCreator(creator: string): Promise<string[]> {
+    const getTracesFn = this.contract.getFunction("getTracesByCreator");
+    const hashes = await getTracesFn(creator);
+    return (hashes as string[]).map((h: string) => h);
+  }
+
+  /**
+   * Get paginated traces by agent ID
+   * @param agentId - The agent identifier
+   * @param offset - Starting index (default 0)
+   * @param limit - Maximum results (default 100)
+   * @returns Object with traces array and total count
+   */
+  async getTracesByAgentPaginated(
+    agentId: string,
+    offset = 0,
+    limit = 100
+  ): Promise<{ traces: string[]; total: number }> {
+    const agentIdBytes32 = stringToBytes32(agentId);
+    const fn = this.contract.getFunction("getTracesByAgentPaginated");
+    const [traces, total] = await fn(agentIdBytes32, offset, limit);
+    return {
+      traces: (traces as string[]).map((h: string) => h),
+      total: Number(total),
+    };
+  }
+
+  /**
+   * Get paginated traces by creator address
+   * @param creator - The creator address
+   * @param offset - Starting index (default 0)
+   * @param limit - Maximum results (default 100)
+   * @returns Object with traces array and total count
+   */
+  async getTracesByCreatorPaginated(
+    creator: string,
+    offset = 0,
+    limit = 100
+  ): Promise<{ traces: string[]; total: number }> {
+    const fn = this.contract.getFunction("getTracesByCreatorPaginated");
+    const [traces, total] = await fn(creator, offset, limit);
+    return {
+      traces: (traces as string[]).map((h: string) => h),
+      total: Number(total),
+    };
   }
 
   /**

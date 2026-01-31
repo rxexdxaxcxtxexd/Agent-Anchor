@@ -35,6 +35,16 @@ export function hashTrace(trace: AgentTrace): string {
 }
 
 /**
+ * Maximum content size for validation (10MB)
+ */
+export const MAX_CONTENT_SIZE = 10 * 1024 * 1024;
+
+/**
+ * ISO 8601 timestamp regex pattern
+ */
+const ISO_8601_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
+/**
  * Validate trace data structure
  * @param trace - The trace to validate
  * @returns validation result with optional error message
@@ -62,12 +72,26 @@ export function validateTrace(trace: unknown): { valid: boolean; error?: string 
     return { valid: false, error: "Missing or invalid timestamp field" };
   }
 
+  // QA-004: Validate timestamp format (ISO 8601)
+  if (!ISO_8601_REGEX.test(t.timestamp as string)) {
+    return { valid: false, error: "Invalid timestamp format (expected ISO 8601)" };
+  }
+
   if (typeof t.granularity !== "number" || t.granularity < 0 || t.granularity > 2) {
     return { valid: false, error: "Missing or invalid granularity field (must be 0, 1, or 2)" };
   }
 
   if (t.content === undefined) {
     return { valid: false, error: "Missing content field" };
+  }
+
+  // QA-004: Validate content size
+  const contentStr = JSON.stringify(t.content);
+  if (contentStr.length > MAX_CONTENT_SIZE) {
+    return {
+      valid: false,
+      error: `Content too large: ${contentStr.length} bytes (max: ${MAX_CONTENT_SIZE})`,
+    };
   }
 
   return { valid: true };
@@ -88,20 +112,47 @@ export function stringToBytes32(str: string): string {
 }
 
 /**
+ * CID format validation patterns
+ * CIDv0: Starts with "Qm" followed by 44 base58 characters
+ * CIDv1: Starts with "b" followed by base32 characters (typically 58+ chars)
+ */
+const CID_V0_REGEX = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
+const CID_V1_REGEX = /^b[a-z2-7]{58,}$/;
+
+/**
+ * Validate IPFS CID format
+ * @param cid - IPFS CID to validate
+ * @returns True if CID format is valid (CIDv0 or CIDv1)
+ */
+export function isValidCid(cid: string): boolean {
+  return CID_V0_REGEX.test(cid) || CID_V1_REGEX.test(cid);
+}
+
+/**
  * Parse IPFS URI to CID
  * @param uri - IPFS URI (ipfs://... or gateway URL)
  * @returns IPFS CID
+ * @throws Error if URI format or CID format is invalid
  */
 export function parseIpfsUri(uri: string): string {
+  let cid: string;
+
   if (uri.startsWith("ipfs://")) {
-    return uri.slice(7);
+    cid = uri.slice(7);
+  } else {
+    // Handle gateway URLs
+    const match = uri.match(/\/ipfs\/([a-zA-Z0-9]+)/);
+    if (!match?.[1]) {
+      throw new Error(`Invalid IPFS URI: ${uri}`);
+    }
+    cid = match[1];
   }
-  // Handle gateway URLs
-  const match = uri.match(/\/ipfs\/([a-zA-Z0-9]+)/);
-  if (match && match[1]) {
-    return match[1];
+
+  if (!isValidCid(cid)) {
+    throw new Error(`Invalid CID format: ${cid}`);
   }
-  throw new Error(`Invalid IPFS URI: ${uri}`);
+
+  return cid;
 }
 
 /**

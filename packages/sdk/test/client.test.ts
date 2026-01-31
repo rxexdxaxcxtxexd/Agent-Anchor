@@ -239,17 +239,25 @@ describe("Trace Verification Logic", () => {
 describe("IPFS URI Handling", () => {
   describe("parseIpfsUri", () => {
     it("should parse ipfs:// URI", () => {
-      const cid = parseIpfsUri("ipfs://QmTest123");
-      expect(cid).toBe("QmTest123");
+      // Use a valid CIDv0 format (Qm + 44 base58 chars)
+      const validCid = "QmYwAPJzv5CZsnAzt8auVZRVyTM9q9J1xsNQ8bqPw9kDzS";
+      const cid = parseIpfsUri(`ipfs://${validCid}`);
+      expect(cid).toBe(validCid);
     });
 
     it("should parse gateway URL", () => {
-      const cid = parseIpfsUri("https://w3s.link/ipfs/QmTest456");
-      expect(cid).toBe("QmTest456");
+      // Use a valid CIDv0 format
+      const validCid = "QmT5NvUtoM5nWFfrQdVrFtvGfKFmG7AHE8P34isapyhCxX";
+      const cid = parseIpfsUri(`https://w3s.link/ipfs/${validCid}`);
+      expect(cid).toBe(validCid);
     });
 
     it("should throw for invalid URI", () => {
       expect(() => parseIpfsUri("http://example.com")).toThrow("Invalid IPFS URI");
+    });
+
+    it("should throw for invalid CID format", () => {
+      expect(() => parseIpfsUri("ipfs://invalid-cid")).toThrow("Invalid CID format");
     });
   });
 
