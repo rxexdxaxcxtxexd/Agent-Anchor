@@ -16,6 +16,56 @@ export const MAX_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
 export const FETCH_TIMEOUT = 30000; // 30 seconds
 
 /**
+ * Stream response body with hard byte limit enforcement
+ * Reads chunks incrementally and aborts if limit exceeded.
+ * This protects against malicious gateways that lie about content-length.
+ *
+ * @param response - Fetch Response object
+ * @param maxBytes - Maximum bytes to read
+ * @returns ArrayBuffer of response body
+ * @throws Error if content exceeds maxBytes
+ */
+async function streamWithLimit(
+  response: Response,
+  maxBytes: number
+): Promise<ArrayBuffer> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Response body is not readable");
+  }
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.length;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new Error(
+          `Content exceeds maximum size: ${totalBytes}+ bytes (max: ${maxBytes})`
+        );
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  // Combine chunks into single ArrayBuffer
+  const result = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result.buffer;
+}
+
+/**
  * IPFS client configuration
  */
 export interface IpfsConfig {
@@ -176,7 +226,7 @@ export class IpfsClient {
           throw new Error(`IPFS fetch failed: ${res.status}`);
         }
 
-        // SEC-004: Check content-length header if available
+        // SEC-004: Early reject if content-length header indicates too large (optimization)
         const contentLength = res.headers.get("content-length");
         if (contentLength && parseInt(contentLength, 10) > MAX_FETCH_SIZE) {
           throw new Error(
@@ -184,7 +234,10 @@ export class IpfsClient {
           );
         }
 
-        return res.json();
+        // SEC-004: Stream with hard cap - enforces limit even without/wrong content-length
+        const buffer = await streamWithLimit(res, MAX_FETCH_SIZE);
+        const text = new TextDecoder().decode(buffer);
+        return JSON.parse(text);
       } finally {
         clearTimeout(timeout);
       }
@@ -215,7 +268,7 @@ export class IpfsClient {
           throw new Error(`IPFS fetch failed: ${res.status}`);
         }
 
-        // SEC-004: Check content-length header if available
+        // SEC-004: Early reject if content-length header indicates too large (optimization)
         const contentLength = res.headers.get("content-length");
         if (contentLength && parseInt(contentLength, 10) > MAX_FETCH_SIZE) {
           throw new Error(
@@ -223,7 +276,8 @@ export class IpfsClient {
           );
         }
 
-        return res.arrayBuffer();
+        // SEC-004: Stream with hard cap - enforces limit even without/wrong content-length
+        return await streamWithLimit(res, MAX_FETCH_SIZE);
       } finally {
         clearTimeout(timeout);
       }

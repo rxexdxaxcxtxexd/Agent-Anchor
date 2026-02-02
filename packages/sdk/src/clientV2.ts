@@ -27,7 +27,7 @@ import type {
   GetTreeOptions,
   TraceTreeNode,
 } from "./types.js";
-import { hashTrace, validateTrace, stringToBytes32 } from "./utils.js";
+import { hashTrace, validateTrace, stringToBytes32, parseIpfsUri } from "./utils.js";
 import { IpfsClient, createMockIpfsClient } from "./ipfs.js";
 import { createIdentitySignature } from "./identity.js";
 import { getTraceLineage as getTraceLineageHelper, getTraceTree as getTraceTreeHelper } from "./linking.js";
@@ -172,6 +172,12 @@ export class AgentAnchorClientV2 {
 
     let ipfsUri: string;
     if (options?.ipfsUri) {
+      // SEC-006: Validate user-provided IPFS URI (mirror V1 validation)
+      try {
+        parseIpfsUri(options.ipfsUri);
+      } catch (error) {
+        throw new Error(`Invalid IPFS URI provided: ${options.ipfsUri}`);
+      }
       ipfsUri = options.ipfsUri;
     } else {
       const uploadResult = await this.ipfsClient.upload(trace);

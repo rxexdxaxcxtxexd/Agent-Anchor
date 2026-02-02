@@ -240,11 +240,11 @@ export function validateTreeOptions(options?: GetTreeOptions): void {
 }
 
 /**
- * Get the full tree (descendants) from a root trace using BFS traversal
+ * Get the full tree (descendants) from a root trace using iterative BFS traversal
  *
  * Traverses from the given trace down through all its descendants,
- * building a tree structure. Uses breadth-first search (BFS) to ensure
- * level-by-level traversal.
+ * building a tree structure. Uses an explicit queue to avoid stack overflow
+ * on deep trees.
  *
  * @param client - Client with getChildTraces and optionally getAnchor methods
  * @param rootTraceHash - Root trace hash to start from
@@ -255,7 +255,7 @@ export function validateTreeOptions(options?: GetTreeOptions): void {
  * ```typescript
  * const client = new AgentAnchorClient({ ... });
  * const tree = await getTraceTree(client, rootHash, { maxDepth: 5 });
- * console.log(`Tree has ${countNodes(tree)} nodes`);
+ * console.log(`Tree has ${countTreeNodes(tree)} nodes`);
  * ```
  *
  * @throws Error if maxNodes is exceeded during traversal
@@ -273,13 +273,30 @@ export async function getTraceTree(
   const maxNodes = options?.maxNodes ?? DEFAULT_TREE_MAX_NODES;
   const includeAnchors = options?.includeAnchors ?? false;
 
+  // Map to store all nodes by traceHash for parent linking
+  const nodeMap = new Map<string, TraceTreeNode>();
+
+  // Queue items: [traceHash, parentTraceHash | null, depth]
+  type QueueItem = [string, string | null, number];
+  const queue: QueueItem[] = [[rootTraceHash, null, 0]];
   let nodeCount = 0;
 
-  /**
-   * Recursively builds a tree node and its children
-   * Uses depth-first construction but respects BFS-like level limits via maxDepth
-   */
-  async function buildNode(traceHash: string, depth: number): Promise<TraceTreeNode> {
+  while (queue.length > 0) {
+    const [traceHash, parentHash, depth] = queue.shift()!;
+
+    // Skip if already processed (handles cycles gracefully)
+    if (nodeMap.has(traceHash)) {
+      // Still link to parent if this is a second reference to same node
+      if (parentHash && nodeMap.has(parentHash)) {
+        const existingNode = nodeMap.get(traceHash)!;
+        const parent = nodeMap.get(parentHash)!;
+        if (!parent.children.includes(existingNode)) {
+          parent.children.push(existingNode);
+        }
+      }
+      continue;
+    }
+
     nodeCount++;
     if (nodeCount > maxNodes) {
       throw new Error(
@@ -288,6 +305,7 @@ export async function getTraceTree(
       );
     }
 
+    // Create node
     const node: TraceTreeNode = {
       traceHash,
       children: [],
@@ -304,19 +322,29 @@ export async function getTraceTree(
       }
     }
 
-    // Only traverse children if we haven't reached max depth
+    // Store in map
+    nodeMap.set(traceHash, node);
+
+    // Link to parent
+    if (parentHash && nodeMap.has(parentHash)) {
+      nodeMap.get(parentHash)!.children.push(node);
+    }
+
+    // Queue children if within depth limit
     if (depth < maxDepth) {
       const childHashes = await client.getChildTraces(traceHash);
       for (const childHash of childHashes) {
-        const childNode = await buildNode(childHash, depth + 1);
-        node.children.push(childNode);
+        queue.push([childHash, traceHash, depth + 1]);
       }
     }
-
-    return node;
   }
 
-  return buildNode(rootTraceHash, 0);
+  const root = nodeMap.get(rootTraceHash);
+  if (!root) {
+    throw new Error(`Failed to build tree: root node not found`);
+  }
+
+  return root;
 }
 
 /**

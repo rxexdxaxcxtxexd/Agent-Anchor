@@ -185,7 +185,8 @@ describe("AgentAnchorClientV2 Integration", () => {
         mockIpfs: true,
       });
 
-      const customIpfsUri = "ipfs://QmCustomHash123456789";
+      // Use a valid CIDv0 format (Qm + 44 base58 chars)
+      const customIpfsUri = "ipfs://QmYwAPJzv5CZsnAzt8auVZRVyTM9q9J1xsNQ8bqPw9kDzS";
       const result = await client.anchorTrace(mockTrace, {
         ipfsUri: customIpfsUri,
       });

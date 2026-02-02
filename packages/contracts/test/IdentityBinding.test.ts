@@ -285,14 +285,15 @@ describe("AgentAnchorV2 - Identity Binding (US1)", function () {
         .to.be.revertedWithCustomError(agentAnchorV2, "TraceNotFound");
     });
 
-    it("should allow different user to bind identity", async function () {
+    it("should NOT allow different user to bind identity (security fix)", async function () {
       const { agentAnchorV2, user1, traceHash } = await loadFixture(deployWithAnchorFixture);
 
       const chainId = (await ethers.provider.getNetwork()).chainId;
       const contractAddress = await agentAnchorV2.getAddress();
       const anchorTimestamp = await getAnchorTimestamp(agentAnchorV2, traceHash);
 
-      // User1 (not the anchor creator) binds their identity
+      // User1 (not the anchor creator) tries to bind their identity
+      // This should fail - only the trace creator can bind identity (security fix)
       const signature = await createIdentitySignature(
         user1,
         contractAddress,
@@ -301,10 +302,9 @@ describe("AgentAnchorV2 - Identity Binding (US1)", function () {
         anchorTimestamp
       );
 
-      await agentAnchorV2.connect(user1).bindIdentity(traceHash, signature);
-
-      const binding = await agentAnchorV2.getIdentityBinding(traceHash);
-      expect(binding.signer).to.equal(user1.address);
+      // Security fix: Only trace creator can bind identity to prevent attribution theft
+      await expect(agentAnchorV2.connect(user1).bindIdentity(traceHash, signature))
+        .to.be.revertedWithCustomError(agentAnchorV2, "NotTraceCreator");
     });
 
     it("should record binding timestamp", async function () {
