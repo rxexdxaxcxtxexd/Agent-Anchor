@@ -22,10 +22,15 @@ import type {
   OwnershipRecord,
   DeclarationType,
   AnchorOptionsV2,
+  TraceLineage,
+  GetLineageOptions,
+  GetTreeOptions,
+  TraceTreeNode,
 } from "./types.js";
 import { hashTrace, validateTrace, stringToBytes32 } from "./utils.js";
 import { IpfsClient, createMockIpfsClient } from "./ipfs.js";
 import { createIdentitySignature } from "./identity.js";
+import { getTraceLineage as getTraceLineageHelper, getTraceTree as getTraceTreeHelper } from "./linking.js";
 
 /**
  * Extended client options for V2
@@ -185,8 +190,14 @@ export class AgentAnchorClientV2 {
       };
     }
 
+    // Submit transaction with optional parent linking
     const anchorFn = this.contract.getFunction("anchorTrace");
-    const tx = await anchorFn(traceHash, ipfsUri, agentIdBytes32, trace.granularity);
+    const parentTraceHash = options?.parentTraceHash || "0x" + "0".repeat(64);
+
+    // Use 5-arg version if parent specified, otherwise 4-arg for backward compatibility
+    const tx = parentTraceHash !== "0x" + "0".repeat(64)
+      ? await anchorFn(traceHash, ipfsUri, agentIdBytes32, trace.granularity, parentTraceHash)
+      : await anchorFn(traceHash, ipfsUri, agentIdBytes32, trace.granularity);
 
     const receipt = await tx.wait();
     if (!receipt) {
@@ -521,5 +532,141 @@ export class AgentAnchorClientV2 {
    */
   getChainId(): bigint {
     return this.chainId;
+  }
+
+  // ============ Trace Linking Methods ============
+
+  /**
+   * Get the parent trace hash for a given trace
+   * @param traceHash - The trace hash to query
+   * @returns Parent trace info
+   */
+  async getParentTrace(traceHash: string): Promise<{ parentHash: string; hasParent: boolean }> {
+    const fn = this.contract.getFunction("getParentTrace");
+    const [parentHash, hasParent] = await fn(traceHash);
+    return { parentHash, hasParent };
+  }
+
+  /**
+   * Get all child traces for a given parent
+   * @param parentTraceHash - The parent trace hash
+   * @returns Array of child trace hashes
+   * @deprecated Use getChildTracesPaginated for large datasets
+   */
+  async getChildTraces(parentTraceHash: string): Promise<string[]> {
+    const fn = this.contract.getFunction("getChildTraces");
+    const hashes = await fn(parentTraceHash);
+    return (hashes as string[]).map((h: string) => h);
+  }
+
+  /**
+   * Get paginated child traces for a given parent
+   * @param parentTraceHash - The parent trace hash
+   * @param offset - Starting index
+   * @param limit - Maximum results to return
+   * @returns Paginated children result
+   */
+  async getChildTracesPaginated(
+    parentTraceHash: string,
+    offset = 0,
+    limit = 100
+  ): Promise<{ children: string[]; total: number }> {
+    const fn = this.contract.getFunction("getChildTracesPaginated");
+    const [children, total] = await fn(parentTraceHash, offset, limit);
+    return {
+      children: (children as string[]).map((h: string) => h),
+      total: Number(total),
+    };
+  }
+
+  /**
+   * Get the count of child traces
+   * @param parentTraceHash - The parent trace hash
+   * @returns Number of children
+   */
+  async getChildTraceCount(parentTraceHash: string): Promise<number> {
+    const fn = this.contract.getFunction("getChildTraceCount");
+    const count = await fn(parentTraceHash);
+    return Number(count);
+  }
+
+  /**
+   * Check if a trace is a root trace (no parent)
+   * @param traceHash - The trace hash to check
+   * @returns True if root trace
+   */
+  async isRootTrace(traceHash: string): Promise<boolean> {
+    const fn = this.contract.getFunction("isRootTrace");
+    return await fn(traceHash);
+  }
+
+  /**
+   * Get the full lineage (ancestry) of a trace
+   *
+   * Traverses from the given trace up through its parents until reaching
+   * a root trace (one with no parent) or hitting the maxDepth limit.
+   *
+   * @param traceHash - Starting trace hash
+   * @param options - Lineage query options (maxDepth defaults to 100)
+   * @returns TraceLineage with ancestors from trace to root
+   *
+   * @example
+   * ```typescript
+   * const lineage = await client.getTraceLineage(myTraceHash);
+   * console.log(`Trace has ${lineage.depth} ancestors`);
+   * console.log(`Root trace: ${lineage.root}`);
+   * ```
+   *
+   * @throws Error if maxDepth is exceeded during traversal
+   */
+  async getTraceLineage(traceHash: string, options?: GetLineageOptions): Promise<TraceLineage> {
+    return getTraceLineageHelper(this, traceHash, options);
+  }
+
+  /**
+   * Get anchor data for a trace
+   * @param traceHash - The trace hash to query
+   * @returns Anchor data
+   */
+  async getAnchor(traceHash: string): Promise<Anchor> {
+    const getAnchorFn = this.contract.getFunction("getAnchor");
+    const anchorData = await getAnchorFn(traceHash);
+
+    return {
+      traceHash: anchorData.traceHash,
+      ipfsUri: anchorData.ipfsUri,
+      agentId: anchorData.agentId,
+      granularity: Number(anchorData.granularity) as Granularity,
+      creator: anchorData.creator,
+      timestamp: Number(anchorData.timestamp),
+      blockNumber: Number(anchorData.blockNumber),
+      parentTraceHash: anchorData.parentTraceHash,
+    };
+  }
+
+  /**
+   * Get the full tree (descendants) from a root trace
+   *
+   * Traverses from the given trace down through all its descendants,
+   * building a tree structure using BFS traversal.
+   *
+   * @param rootTraceHash - Root trace hash to start from
+   * @param options - Tree query options (maxDepth, maxNodes, includeAnchors)
+   * @returns TraceTreeNode with all descendants
+   *
+   * @example
+   * ```typescript
+   * const tree = await client.getTraceTree(rootHash, {
+   *   maxDepth: 5,
+   *   maxNodes: 100,
+   *   includeAnchors: true
+   * });
+   * console.log(`Tree has ${tree.children.length} direct children`);
+   * ```
+   *
+   * @throws Error if maxNodes is exceeded during traversal
+   */
+  async getTraceTree(rootTraceHash: string, options?: GetTreeOptions): Promise<TraceTreeNode> {
+    return getTraceTreeHelper(this, rootTraceHash, options);
   }
 }

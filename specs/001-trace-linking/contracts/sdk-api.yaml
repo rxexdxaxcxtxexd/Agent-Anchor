@@ -1,0 +1,301 @@
+# SDK API Contract for Trace Linking
+# This defines the TypeScript SDK interface additions
+
+openapi: 3.0.3
+info:
+  title: Agent Anchor SDK - Trace Linking API
+  version: 1.0.0
+  description: |
+    API contract for trace linking functionality in the Agent Anchor SDK.
+    These methods are added to both AgentAnchorClient and AgentAnchorClientV2.
+
+paths:
+  # Note: These are SDK method signatures, not REST endpoints
+  # Using OpenAPI format for consistency and tooling support
+
+  /client/anchorTrace:
+    post:
+      summary: Anchor a trace with optional parent link
+      description: |
+        Extended anchorTrace method that accepts parentTraceHash option.
+        If parentTraceHash is provided and non-zero, validates parent exists.
+      operationId: anchorTrace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnchorTraceRequest'
+      responses:
+        '200':
+          description: Anchor successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnchorResult'
+        '400':
+          description: Validation error (invalid parent, self-reference)
+
+  /client/getParentTrace:
+    get:
+      summary: Get parent trace hash
+      operationId: getParentTrace
+      parameters:
+        - name: traceHash
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{64}$'
+      responses:
+        '200':
+          description: Parent trace info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParentTraceResult'
+
+  /client/getChildTraces:
+    get:
+      summary: Get all child traces (deprecated - use paginated)
+      operationId: getChildTraces
+      deprecated: true
+      parameters:
+        - name: parentTraceHash
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Child trace hashes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /client/getChildTracesPaginated:
+    get:
+      summary: Get paginated child traces
+      operationId: getChildTracesPaginated
+      parameters:
+        - name: parentTraceHash
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Paginated children
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedChildrenResult'
+
+  /client/getTraceLineage:
+    get:
+      summary: Get full ancestry of a trace (SDK-side)
+      operationId: getTraceLineage
+      parameters:
+        - name: traceHash
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: maxDepth
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Trace lineage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceLineage'
+
+  /client/getTraceTree:
+    get:
+      summary: Get full descendant tree from a root (SDK-side)
+      operationId: getTraceTree
+      parameters:
+        - name: rootTraceHash
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: maxDepth
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: maxNodes
+          in: query
+          schema:
+            type: integer
+            default: 1000
+        - name: includeAnchors
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Trace tree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceTreeNode'
+
+components:
+  schemas:
+    AnchorTraceRequest:
+      type: object
+      required:
+        - trace
+      properties:
+        trace:
+          $ref: '#/components/schemas/AgentTrace'
+        options:
+          $ref: '#/components/schemas/AnchorOptions'
+
+    AnchorOptions:
+      type: object
+      properties:
+        ipfsUri:
+          type: string
+          description: Skip IPFS upload and use provided URI
+        dryRun:
+          type: boolean
+          description: Estimate gas without submitting
+        parentTraceHash:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{64}$'
+          description: Link to parent trace (omit or 0x0 for root)
+
+    AgentTrace:
+      type: object
+      required:
+        - version
+        - traceId
+        - agentId
+        - timestamp
+        - granularity
+        - content
+      properties:
+        version:
+          type: string
+        traceId:
+          type: string
+        agentId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        granularity:
+          type: integer
+          enum: [0, 1, 2]
+        content:
+          type: object
+
+    AnchorResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        transactionHash:
+          type: string
+        blockNumber:
+          type: integer
+        traceHash:
+          type: string
+        ipfsUri:
+          type: string
+        gasUsed:
+          type: string
+        parentTraceHash:
+          type: string
+          description: Parent hash if linked, 0x0 if root
+
+    ParentTraceResult:
+      type: object
+      properties:
+        parentHash:
+          type: string
+        hasParent:
+          type: boolean
+
+    PaginatedChildrenResult:
+      type: object
+      properties:
+        children:
+          type: array
+          items:
+            type: string
+        total:
+          type: integer
+
+    TraceLineage:
+      type: object
+      properties:
+        traceHash:
+          type: string
+          description: Starting trace
+        ancestors:
+          type: array
+          items:
+            type: string
+          description: Ordered from self to root
+        depth:
+          type: integer
+          description: Number of ancestors (0 = root)
+        root:
+          type: string
+          description: Root trace hash
+
+    TraceTreeNode:
+      type: object
+      properties:
+        traceHash:
+          type: string
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+          description: Full anchor data if includeAnchors=true
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraceTreeNode'
+        depth:
+          type: integer
+
+    Anchor:
+      type: object
+      properties:
+        traceHash:
+          type: string
+        ipfsUri:
+          type: string
+        agentId:
+          type: string
+        granularity:
+          type: integer
+        creator:
+          type: string
+        timestamp:
+          type: integer
+        blockNumber:
+          type: integer
+        parentTraceHash:
+          type: string

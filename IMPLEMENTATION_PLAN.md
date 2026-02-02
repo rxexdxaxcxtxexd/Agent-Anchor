@@ -103,7 +103,10 @@ pragma solidity ^0.8.20;
 contract AgentAnchor {
 
     // Granularity levels for trace storage
-    enum Granularity { FULL, KEY_DECISIONS, HASH_ONLY }
+    // Session = 0: High-level session summary
+    // Task = 1: Task-level granularity
+    // Step = 2: Fine-grained step-by-step detail
+    enum Granularity { Session, Task, Step }
 
     struct Anchor {
         bytes32 traceHash;        // keccak256 of trace JSON
@@ -111,7 +114,7 @@ contract AgentAnchor {
         address creator;          // Who anchored this
         uint256 timestamp;        // Block timestamp
         Granularity granularity;  // Trace detail level
-        bytes32 agentId;          // Optional: link to agent identity
+        bytes32 agentId;          // Required: agent identifier (hashed)
     }
 
     // Storage
@@ -169,45 +172,53 @@ contract AgentAnchor {
 
 ```typescript
 // types.ts
+
+// Granularity enum matching the contract
+enum Granularity {
+  Session = 0,  // High-level session summary
+  Task = 1,     // Task-level granularity
+  Step = 2,     // Fine-grained step-by-step detail
+}
+
+// The trace data structure that gets anchored
 interface AgentTrace {
-  version: string;
-  id: string;
-  timestamp: string;
-  vcs: { system: string; revision: string };
-  tool: { name: string; version: string };
-  files: FileAttribution[];
+  version: string;          // Schema version (e.g., "1.0.0")
+  traceId: string;          // Unique trace identifier
+  agentId: string;          // Agent identifier (required)
+  sessionId?: string;       // Optional session grouping
+  timestamp: string;        // ISO 8601 timestamp
+  granularity: Granularity; // Detail level (0, 1, or 2)
+  content: unknown;         // Flexible content payload
+  metadata?: Record<string, unknown>; // Optional metadata
 }
 
-interface FileAttribution {
-  path: string;
-  conversations: Conversation[];
-}
-
-interface Conversation {
-  url?: string;
-  ranges: LineRange[];
-  contributor: 'human' | 'ai' | 'mixed' | 'unknown';
-  model?: string;
-}
-
+// Result from anchoring a trace
 interface AnchorResult {
+  success: boolean;
+  transactionHash: string;
+  blockNumber: number;
+  traceHash: string;        // keccak256 of trace JSON
+  ipfsUri: string;          // IPFS URI where trace is stored
+  gasUsed: bigint;
+}
+
+// Result from verifying a trace
+interface VerifyResult {
+  exists: boolean;
+  hashMatches?: boolean;    // True if IPFS content matches on-chain hash
+  anchor?: Anchor;          // Full anchor data if exists
+  error?: string;           // Error message if verification failed
+}
+
+// On-chain anchor record
+interface Anchor {
   traceHash: string;
   ipfsUri: string;
-  txHash: string;
+  agentId: string;          // bytes32 format
+  granularity: Granularity;
+  creator: string;          // Address that submitted the anchor
+  timestamp: number;        // Block timestamp
   blockNumber: number;
-  network: 'polygon' | 'base';
-  explorerUrl: string;
-}
-
-interface VerifyResult {
-  valid: boolean;
-  anchor?: {
-    creator: string;
-    timestamp: Date;
-    granularity: 'FULL' | 'KEY_DECISIONS' | 'HASH_ONLY';
-  };
-  ipfsData?: AgentTrace;
-  hashMatch: boolean;
 }
 ```
 

@@ -4,7 +4,7 @@
  * Tests for security-related features: CID validation, size limits, timeout handling
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   validateTrace,
   parseIpfsUri,
@@ -15,7 +15,9 @@ import {
   MAX_UPLOAD_SIZE,
   MAX_FETCH_SIZE,
   FETCH_TIMEOUT,
+  IpfsClient,
 } from "../src/ipfs.js";
+import { AgentAnchorClient } from "../src/client.js";
 import type { AgentTrace, Granularity } from "../src/types.js";
 
 // Test trace fixture helper
@@ -306,6 +308,123 @@ describe("QA-004: Enhanced Validation", () => {
       const result = validateTrace(trace);
       expect(result.valid).toBe(false);
       expect(result.error).toContain("agentId");
+    });
+  });
+});
+
+describe("SEC-006: User-Provided IPFS URI Validation", () => {
+  describe("AgentAnchorClient.anchorTrace() with ipfsUri option", () => {
+    let client: AgentAnchorClient;
+    const validTrace = {
+      version: "1.0.0",
+      traceId: "test-trace-123",
+      agentId: "test-agent-001",
+      timestamp: new Date().toISOString(),
+      granularity: 0 as const,
+      content: { task: "test" },
+    };
+
+    beforeEach(() => {
+      client = new AgentAnchorClient({
+        network: "localhost",
+        contractAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        mockIpfs: true,
+      });
+    });
+
+    it("should accept valid CIDv0 IPFS URI", async () => {
+      const validUri = "ipfs://QmYwAPJzv5CZsnAzt8auVZRVyTM9q9J1xsNQ8bqPw9kDzS";
+      // This should not throw during URI validation (may fail at contract call)
+      try {
+        await client.anchorTrace(validTrace, { ipfsUri: validUri, dryRun: true });
+      } catch (error: unknown) {
+        // May fail at contract level but not at URI validation
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        expect(errorMessage).not.toContain("Invalid IPFS URI");
+      }
+    });
+
+    it("should accept valid CIDv1 IPFS URI", async () => {
+      const validUri = "ipfs://bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+      // This should not throw during URI validation (may fail at contract call)
+      try {
+        await client.anchorTrace(validTrace, { ipfsUri: validUri, dryRun: true });
+      } catch (error: unknown) {
+        // May fail at contract level but not at URI validation
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        expect(errorMessage).not.toContain("Invalid IPFS URI");
+      }
+    });
+
+    it("should reject invalid IPFS URI format", async () => {
+      const invalidUri = "ipfs://not-a-valid-cid";
+      await expect(
+        client.anchorTrace(validTrace, { ipfsUri: invalidUri })
+      ).rejects.toThrow("Invalid IPFS URI");
+    });
+
+    it("should reject malformed IPFS URI", async () => {
+      const invalidUri = "https://example.com/not-ipfs";
+      await expect(
+        client.anchorTrace(validTrace, { ipfsUri: invalidUri })
+      ).rejects.toThrow("Invalid IPFS URI");
+    });
+
+    it("should reject IPFS URI with invalid CID characters", async () => {
+      // CIDv0 with invalid base58 characters (0, l, O, I)
+      const invalidUri = "ipfs://Qm0lOIinvalidbase58chars123456789012345678901234";
+      await expect(
+        client.anchorTrace(validTrace, { ipfsUri: invalidUri })
+      ).rejects.toThrow("Invalid IPFS URI");
+    });
+  });
+
+  describe("IpfsClient.parseCid() validation", () => {
+    let ipfsClient: IpfsClient;
+
+    beforeEach(() => {
+      ipfsClient = new IpfsClient({ apiToken: "test-token" });
+    });
+
+    it("should accept valid CIDv0", async () => {
+      const validCid = "QmYwAPJzv5CZsnAzt8auVZRVyTM9q9J1xsNQ8bqPw9kDzS";
+      // exists() internally calls parseCid(), testing indirectly
+      // Mock fetch to avoid actual network call
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+      const result = await ipfsClient.exists(`ipfs://${validCid}`);
+      expect(result).toBe(true);
+      vi.unstubAllGlobals();
+    });
+
+    it("should accept valid CIDv1", async () => {
+      const validCid = "bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+      const result = await ipfsClient.exists(`ipfs://${validCid}`);
+      expect(result).toBe(true);
+      vi.unstubAllGlobals();
+    });
+
+    it("should reject invalid CID in URI", async () => {
+      const invalidCid = "not-a-valid-cid-format";
+      // exists() catches errors and returns false
+      const result = await ipfsClient.exists(`ipfs://${invalidCid}`);
+      expect(result).toBe(false);
+    });
+
+    it("should reject invalid CID in fetch()", async () => {
+      const invalidUri = "ipfs://invalid-cid-123";
+      await expect(ipfsClient.fetch(invalidUri)).rejects.toThrow("Invalid CID format");
+    });
+
+    it("should reject invalid CID in fetchRaw()", async () => {
+      const invalidUri = "ipfs://invalid-cid-456";
+      await expect(ipfsClient.fetchRaw(invalidUri)).rejects.toThrow("Invalid CID format");
+    });
+
+    it("should reject invalid CID in getGatewayUrl()", () => {
+      const invalidUri = "ipfs://invalid-cid-789";
+      expect(() => ipfsClient.getGatewayUrl(invalidUri)).toThrow("Invalid CID format");
     });
   });
 });

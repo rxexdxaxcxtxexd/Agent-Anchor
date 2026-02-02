@@ -136,6 +136,73 @@ export const AGENT_ANCHOR_ABI = [
   },
   {
     type: "function",
+    name: "anchorTrace",
+    inputs: [
+      { name: "traceHash", type: "bytes32" },
+      { name: "ipfsUri", type: "string" },
+      { name: "agentId", type: "bytes32" },
+      { name: "granularity", type: "uint8" },
+      { name: "parentTraceHash", type: "bytes32" },
+    ],
+    outputs: [{ type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getParentTrace",
+    inputs: [{ name: "traceHash", type: "bytes32" }],
+    outputs: [
+      { name: "parentHash", type: "bytes32" },
+      { name: "hasParent", type: "bool" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getChildTraces",
+    inputs: [{ name: "parentTraceHash", type: "bytes32" }],
+    outputs: [{ name: "childHashes", type: "bytes32[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getChildTracesPaginated",
+    inputs: [
+      { name: "parentTraceHash", type: "bytes32" },
+      { name: "offset", type: "uint256" },
+      { name: "limit", type: "uint256" },
+    ],
+    outputs: [
+      { name: "childHashes", type: "bytes32[]" },
+      { name: "total", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getChildTraceCount",
+    inputs: [{ name: "parentTraceHash", type: "bytes32" }],
+    outputs: [{ name: "count", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "isRootTrace",
+    inputs: [{ name: "traceHash", type: "bytes32" }],
+    outputs: [{ name: "isRoot", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "TraceLinked",
+    inputs: [
+      { name: "childTraceHash", type: "bytes32", indexed: true },
+      { name: "parentTraceHash", type: "bytes32", indexed: true },
+      { name: "timestamp", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "function",
     name: "verifyTrace",
     inputs: [{ name: "traceHash", type: "bytes32" }],
     outputs: [

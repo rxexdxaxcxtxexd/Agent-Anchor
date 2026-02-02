@@ -79,6 +79,25 @@ export {
 } from "./contribution.js";
 export type { CalculationMethod } from "./contribution.js";
 
+// Export trace linking utilities
+export {
+  getTraceLineage,
+  isRootTraceHelper,
+  getRootTrace,
+  getTraceDepth,
+  validateMaxDepth,
+  validateMaxNodes,
+  validateTreeOptions,
+  getTraceTree,
+  countTreeNodes,
+  flattenTree,
+  findTreeNode,
+  DEFAULT_MAX_DEPTH,
+  DEFAULT_TREE_MAX_DEPTH,
+  DEFAULT_TREE_MAX_NODES,
+} from "./linking.js";
+export type { TraceQueryClient, TreeQueryClient } from "./linking.js";
+
 // Export constants
 export * from "./constants.js";
 

@@ -51,7 +51,7 @@ contract.setAllowlist(trustedAddress, true);
 ### SEC-004: IPFS Size Limits
 
 - **Issue**: Fetching large IPFS content could cause DoS
-- **Mitigation**: SDK enforces upload (5MB) and fetch (10MB) limits
+- **Mitigation**: SDK enforces upload (10MB) and fetch (10MB) limits
 - **Constants**: `MAX_UPLOAD_SIZE`, `MAX_FETCH_SIZE`
 
 ### SEC-005: CID Validation
