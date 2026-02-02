@@ -814,4 +814,171 @@ program
     }
   });
 
+// ============ Trace Linking Commands ============
+
+// Children command
+program
+  .command("children <parent-trace-hash>")
+  .description("Get child traces of a parent trace")
+  .option("-n, --network <network>", "Target network", "base-testnet")
+  .option("--rpc-url <url>", "Custom RPC URL")
+  .option("--contract <address>", "Custom contract address")
+  .option("--offset <number>", "Starting index for pagination", "0")
+  .option("--limit <number>", "Maximum results to return", "100")
+  .action(async (parentTraceHash: string, options) => {
+    try {
+      const client = new AgentAnchorClient({
+        network: options.network as Network,
+        rpcUrl: options.rpcUrl,
+        contractAddress: options.contract,
+      });
+
+      if (!program.opts().quiet) {
+        console.log("\nGetting child traces...");
+        formatHuman("Network", options.network);
+        formatHuman("Parent", parentTraceHash);
+        console.log("");
+      }
+
+      const offset = parseInt(options.offset, 10);
+      const limit = parseInt(options.limit, 10);
+      const { children, total } = await client.getChildTracesPaginated(parentTraceHash, offset, limit);
+
+      if (program.opts().json) {
+        console.log(formatJson({ parentTraceHash, children, total, offset, limit }));
+      } else {
+        console.log(`Found ${total} child trace(s)`);
+        if (total > limit) {
+          console.log(`  Showing ${offset + 1}-${Math.min(offset + limit, total)} of ${total}`);
+        }
+        console.log("");
+
+        if (children.length === 0) {
+          console.log("  No child traces found.");
+        } else {
+          children.forEach((hash, i) => {
+            console.log(`  ${offset + i + 1}. ${hash}`);
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  });
+
+// Lineage command
+program
+  .command("lineage <trace-hash>")
+  .description("Show full ancestry of a trace from child to root")
+  .option("-n, --network <network>", "Target network", "base-testnet")
+  .option("--rpc-url <url>", "Custom RPC URL")
+  .option("--contract <address>", "Custom contract address")
+  .option("--max-depth <number>", "Maximum depth to traverse", "100")
+  .action(async (traceHash: string, options) => {
+    try {
+      const client = new AgentAnchorClient({
+        network: options.network as Network,
+        rpcUrl: options.rpcUrl,
+        contractAddress: options.contract,
+      });
+
+      if (!program.opts().quiet) {
+        console.log("\nGetting trace lineage...");
+        formatHuman("Network", options.network);
+        formatHuman("Trace", traceHash);
+        console.log("");
+      }
+
+      const maxDepth = parseInt(options.maxDepth, 10);
+      const lineage = await client.getTraceLineage(traceHash, { maxDepth });
+
+      if (program.opts().json) {
+        console.log(formatJson(lineage));
+      } else {
+        console.log(`Lineage depth: ${lineage.depth}`);
+        formatHuman("Root trace", lineage.root);
+        console.log("\nAncestry (child -> root):");
+
+        lineage.ancestors.forEach((hash, i) => {
+          const label = i === 0 ? "(self)" : i === lineage.ancestors.length - 1 ? "(root)" : "";
+          console.log(`  ${i}. ${hash} ${label}`);
+        });
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  });
+
+// Tree command
+program
+  .command("tree <root-trace-hash>")
+  .description("Show descendant tree from a root trace")
+  .option("-n, --network <network>", "Target network", "base-testnet")
+  .option("--rpc-url <url>", "Custom RPC URL")
+  .option("--contract <address>", "Custom contract address")
+  .option("--depth <number>", "Maximum depth to traverse", "10")
+  .option("--max-nodes <number>", "Maximum nodes to return", "1000")
+  .option("--include-anchors", "Include full anchor data for each node")
+  .action(async (rootTraceHash: string, options) => {
+    try {
+      const client = new AgentAnchorClient({
+        network: options.network as Network,
+        rpcUrl: options.rpcUrl,
+        contractAddress: options.contract,
+      });
+
+      if (!program.opts().quiet) {
+        console.log("\nGetting trace tree...");
+        formatHuman("Network", options.network);
+        formatHuman("Root", rootTraceHash);
+        console.log("");
+      }
+
+      const maxDepth = parseInt(options.depth, 10);
+      const maxNodes = parseInt(options.maxNodes, 10);
+      const tree = await client.getTraceTree(rootTraceHash, {
+        maxDepth,
+        maxNodes,
+        includeAnchors: options.includeAnchors,
+      });
+
+      if (program.opts().json) {
+        console.log(formatJson(tree));
+      } else {
+        // Count total nodes
+        const countNodes = (node: typeof tree): number => {
+          let count = 1;
+          for (const child of node.children) {
+            count += countNodes(child);
+          }
+          return count;
+        };
+
+        const totalNodes = countNodes(tree);
+        console.log(`Tree contains ${totalNodes} node(s)\n`);
+
+        // Print tree structure
+        const printNode = (node: typeof tree, prefix = ""): void => {
+          const isLast = prefix === "" || prefix.endsWith("  ");
+          const connector = prefix === "" ? "" : isLast ? "└── " : "├── ";
+          const hashShort = node.traceHash.slice(0, 10) + "..." + node.traceHash.slice(-6);
+          console.log(`${prefix}${connector}${hashShort} (depth: ${node.depth})`);
+
+          const childPrefix = prefix + (prefix === "" ? "" : isLast ? "    " : "│   ");
+          node.children.forEach((child, i) => {
+            const isLastChild = i === node.children.length - 1;
+            printNode(child, childPrefix.slice(0, -4) + (isLastChild ? "    " : "│   "));
+          });
+        };
+
+        printNode(tree);
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  });
+
 program.parse();

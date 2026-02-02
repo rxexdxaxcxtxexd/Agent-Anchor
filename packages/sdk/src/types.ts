@@ -75,6 +75,8 @@ export interface Anchor {
   timestamp: number;
   /** Block number */
   blockNumber: number;
+  /** Parent trace hash (0x0 if root trace) */
+  parentTraceHash?: string;
 }
 
 /**
@@ -278,4 +280,78 @@ export interface AnchorOptionsV2 {
     /** Repository identifier */
     repository?: string;
   };
+  /** Parent trace hash to link to (0x0 or omit for root trace) */
+  parentTraceHash?: string;
+}
+
+// ============ Trace Linking Types ============
+
+/**
+ * Extended anchor options with parent linking support
+ */
+export interface AnchorOptions {
+  /** Skip IPFS upload and use provided URI */
+  ipfsUri?: string;
+  /** Dry run - estimate gas without submitting */
+  dryRun?: boolean;
+  /** Parent trace hash to link to (0x0 or omit for root trace) */
+  parentTraceHash?: string;
+}
+
+/**
+ * Trace lineage - ancestry from a trace up to its root
+ */
+export interface TraceLineage {
+  /** Starting trace hash */
+  traceHash: string;
+  /** Ordered list of ancestors from self to root */
+  ancestors: string[];
+  /** Number of ancestors (0 = root trace) */
+  depth: number;
+  /** Root trace hash */
+  root: string;
+}
+
+/**
+ * Node in a trace tree structure
+ */
+export interface TraceTreeNode {
+  /** This node's trace hash */
+  traceHash: string;
+  /** Full anchor data (if includeAnchors=true) */
+  anchor?: Anchor;
+  /** Child nodes */
+  children: TraceTreeNode[];
+  /** Depth from root (0 = root) */
+  depth: number;
+}
+
+/**
+ * Options for tree traversal queries
+ */
+export interface GetTreeOptions {
+  /** Maximum depth to traverse (default: 10) */
+  maxDepth?: number;
+  /** Maximum total nodes to return (default: 1000) */
+  maxNodes?: number;
+  /** Whether to include full anchor data (default: false) */
+  includeAnchors?: boolean;
+}
+
+/**
+ * Options for lineage queries
+ */
+export interface GetLineageOptions {
+  /** Maximum depth to traverse (default: 100) */
+  maxDepth?: number;
+}
+
+/**
+ * Result from parent trace query
+ */
+export interface ParentTraceResult {
+  /** Parent trace hash (0x0 if root) */
+  parentHash: string;
+  /** Whether the trace has a parent */
+  hasParent: boolean;
 }

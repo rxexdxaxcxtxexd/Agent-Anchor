@@ -60,7 +60,7 @@ The AgentAnchor contract is **permissionless by default**. This means:
 The SDK validates:
 - **IPFS URI length**: Max 256 bytes (SEC-001)
 - **CID format**: Validates CIDv0 and CIDv1 formats (SEC-005)
-- **Upload size**: Max 5MB for uploads, 10MB for fetches (SEC-004)
+- **Upload size**: Max 10MB for uploads and fetches (SEC-004)
 - **Timestamp format**: ISO 8601 required
 - **Trace content**: Required field validation
 
@@ -224,6 +224,69 @@ RPC_URL=https://...            # RPC endpoint (optional, uses default for networ
 WEB3_STORAGE_TOKEN=...         # For IPFS uploads
 AGENT_ANCHOR_ADDRESS=0x...     # Override contract address
 ```
+
+## Contract Deployment
+
+The SDK includes pre-configured contract addresses for supported networks. For custom deployments:
+
+### Deploying Contracts
+
+1. Navigate to the contracts package:
+   ```bash
+   cd packages/contracts
+   ```
+
+2. Configure deployment settings in `hardhat.config.ts` with your network RPC URLs and deployer private key.
+
+3. Deploy to a network:
+   ```bash
+   # Deploy to testnet
+   npx hardhat run scripts/deploy.ts --network base-sepolia
+
+   # Deploy V2 contract (with ownership layer)
+   npx hardhat run scripts/deploy-v2.ts --network base-sepolia
+   ```
+
+4. Note the deployed contract address from the output.
+
+### Updating SDK Constants
+
+After deployment, update `packages/sdk/src/constants.ts`:
+
+```typescript
+export const NETWORKS: Record<Network, NetworkConfig> = {
+  'base-testnet': {
+    chainId: 84532,
+    name: 'Base Sepolia',
+    rpcUrl: 'https://sepolia.base.org',
+    contractAddress: '0xYOUR_DEPLOYED_ADDRESS', // Update this
+    // ...
+  },
+  // ...
+};
+```
+
+### Custom Contract Address at Runtime
+
+You can also provide a contract address at runtime without modifying constants:
+
+```typescript
+const client = new AgentAnchorClient({
+  network: 'base-testnet',
+  contractAddress: '0xYOUR_DEPLOYED_ADDRESS',  // Override default
+  privateKey: process.env.PRIVATE_KEY,
+});
+```
+
+### Supported Networks
+
+| Network | Chain ID | Explorer |
+|---------|----------|----------|
+| Base Sepolia (testnet) | 84532 | https://sepolia.basescan.org |
+| Base Mainnet | 8453 | https://basescan.org |
+| Polygon Amoy (testnet) | 80002 | https://amoy.polygonscan.com |
+| Polygon Mainnet | 137 | https://polygonscan.com |
+| Localhost | 31337 | - |
 
 ## License
 

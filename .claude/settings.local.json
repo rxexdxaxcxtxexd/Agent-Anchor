@@ -29,7 +29,26 @@
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\sdk && npx tsc --noEmit\")",
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\sdk && npx tsup\")",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Phase 3 - US1 Anchor a Trace \\(complete\\)\n\nContract Tests:\n- 30 comprehensive tests covering anchor, verify, and query\n- 100% code coverage achieved\n- Input validation tests \\(InvalidTraceHash, InvalidIpfsUri, InvalidAgentId\\)\n- Duplicate prevention tests \\(AnchorAlreadyExists\\)\n- Multiple anchors by agent/creator tests\n- Gas usage verification\n\nSDK Implementation:\n- IpfsClient with upload/fetch capabilities\n- MockIpfsClient for testing\n- AgentAnchorClient with full anchorTrace\\(\\) implementation\n- IPFS integration with web3.storage\n- verifyTrace\\(\\) with optional full IPFS verification\n\nCLI Commands:\n- anchor: Anchor trace file with IPFS upload\n- verify: Check anchor existence on-chain\n- list: Query traces by agent\n- hash: Compute trace hash locally\n- validate: Validate trace file structure\n- JSON and human-readable output formats\n- Dry-run mode for gas estimation\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\sdk && npx vitest run\")"
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\layden\\\\Downloads\\\\Agent-Anchor-main\\\\packages\\\\sdk && npx vitest run\")",
+      "Bash(git commit:*)",
+      "WebSearch",
+      "Bash(pnpm compile:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm test)",
+      "Bash(dir:*)",
+      "Bash(npx hardhat compile)",
+      "Bash(npx hardhat test:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e:*)",
+      "Bash(REPORT_GAS=true npx hardhat test:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pwsh:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run build:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(node:*)",
+      "Bash(pnpm hardhat:*)"
     ]
   }
 }

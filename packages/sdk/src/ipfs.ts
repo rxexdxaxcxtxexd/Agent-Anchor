@@ -6,7 +6,7 @@
  */
 
 import { DEFAULT_IPFS_GATEWAY } from "./constants.js";
-import { retryWithBackoff } from "./utils.js";
+import { retryWithBackoff, isValidCid } from "./utils.js";
 
 /**
  * Security limits for IPFS operations
@@ -261,18 +261,30 @@ export class IpfsClient {
 
   /**
    * Parse CID from URI or return as-is
+   * @throws Error if CID format is invalid
    */
   private parseCid(cidOrUri: string): string {
+    let cid: string;
+
     if (cidOrUri.startsWith("ipfs://")) {
-      return cidOrUri.slice(7);
+      cid = cidOrUri.slice(7);
+    } else {
+      // Handle gateway URLs
+      const match = cidOrUri.match(/\/ipfs\/([a-zA-Z0-9]+)/);
+      if (match && match[1]) {
+        cid = match[1];
+      } else {
+        // Assume it's a raw CID
+        cid = cidOrUri;
+      }
     }
-    // Handle gateway URLs
-    const match = cidOrUri.match(/\/ipfs\/([a-zA-Z0-9]+)/);
-    if (match && match[1]) {
-      return match[1];
+
+    // SEC-005: Validate CID format
+    if (!isValidCid(cid)) {
+      throw new Error(`Invalid CID format: ${cid}`);
     }
-    // Assume it's a raw CID
-    return cidOrUri;
+
+    return cid;
   }
 }
 

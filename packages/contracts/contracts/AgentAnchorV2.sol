@@ -44,6 +44,7 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
         address creator;
         uint256 timestamp;
         uint256 blockNumber;
+        bytes32 parentTraceHash;  // Parent trace hash (0x0 = root)
     }
 
     // ============ State Variables ============
@@ -79,6 +80,9 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
     /// @notice Whether identity binding is required for new anchors
     bool public identityRequired;
 
+    /// @notice Mapping from parent trace hash to array of child trace hashes
+    mapping(bytes32 => bytes32[]) public childTraces;
+
     /// @notice EIP-712 domain separator (immutable after deployment)
     bytes32 public immutable DOMAIN_SEPARATOR;
 
@@ -102,6 +106,18 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
     event AllowlistUpdated(address indexed account, bool allowed);
     event IdentityRequiredChanged(bool newValue);
 
+    /**
+     * @notice Emitted when a trace is linked to a parent
+     * @param childTraceHash The child trace hash
+     * @param parentTraceHash The parent trace hash
+     * @param timestamp When the link was created
+     */
+    event TraceLinked(
+        bytes32 indexed childTraceHash,
+        bytes32 indexed parentTraceHash,
+        uint256 timestamp
+    );
+
     // ============ Errors (from V1) ============
 
     error InvalidTraceHash();
@@ -112,6 +128,8 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
     error IpfsUriTooLong(uint256 length, uint256 maxLength);
     error NotAllowed(address caller);
     error IdentityRequired();
+    error ParentTraceNotFound(bytes32 parentTraceHash);
+    error SelfReferenceNotAllowed(bytes32 traceHash);
 
     // ============ Constructor ============
 
@@ -185,12 +203,88 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
             granularity: granularity,
             creator: msg.sender,
             timestamp: block.timestamp,
-            blockNumber: block.number
+            blockNumber: block.number,
+            parentTraceHash: bytes32(0)
         });
 
         agentAnchors[agentId].push(traceHash);
         creatorAnchors[msg.sender].push(traceHash);
         totalAnchors++;
+
+        emit TraceAnchored(
+            traceHash,
+            agentId,
+            msg.sender,
+            ipfsUri,
+            granularity,
+            block.timestamp
+        );
+
+        return true;
+    }
+
+    /**
+     * @notice Anchor a trace with optional parent linking
+     * @param traceHash Keccak256 hash of the trace content
+     * @param ipfsUri IPFS URI where full trace is stored
+     * @param agentId Identifier of the agent
+     * @param granularity Granularity level of the trace
+     * @param parentTraceHash Parent trace hash (0x0 for root trace)
+     * @return success True if anchoring succeeded
+     */
+    function anchorTrace(
+        bytes32 traceHash,
+        string calldata ipfsUri,
+        bytes32 agentId,
+        Granularity granularity,
+        bytes32 parentTraceHash
+    ) external returns (bool success) {
+        if (!permissionless && !allowlist[msg.sender]) {
+            revert NotAllowed(msg.sender);
+        }
+
+        if (traceHash == bytes32(0)) revert InvalidTraceHash();
+        if (bytes(ipfsUri).length == 0) revert InvalidIpfsUri();
+        if (bytes(ipfsUri).length > MAX_IPFS_URI_LENGTH) {
+            revert IpfsUriTooLong(bytes(ipfsUri).length, MAX_IPFS_URI_LENGTH);
+        }
+        if (agentId == bytes32(0)) revert InvalidAgentId();
+
+        if (anchors[traceHash].timestamp != 0) {
+            revert AnchorAlreadyExists(traceHash);
+        }
+
+        // Parent validation
+        if (parentTraceHash != bytes32(0)) {
+            if (parentTraceHash == traceHash) {
+                revert SelfReferenceNotAllowed(traceHash);
+            }
+            if (anchors[parentTraceHash].timestamp == 0) {
+                revert ParentTraceNotFound(parentTraceHash);
+            }
+        }
+
+        // Store anchor with parent reference
+        anchors[traceHash] = Anchor({
+            traceHash: traceHash,
+            ipfsUri: ipfsUri,
+            agentId: agentId,
+            granularity: granularity,
+            creator: msg.sender,
+            timestamp: block.timestamp,
+            blockNumber: block.number,
+            parentTraceHash: parentTraceHash
+        });
+
+        agentAnchors[agentId].push(traceHash);
+        creatorAnchors[msg.sender].push(traceHash);
+        totalAnchors++;
+
+        // Update child index if parent specified
+        if (parentTraceHash != bytes32(0)) {
+            childTraces[parentTraceHash].push(traceHash);
+            emit TraceLinked(traceHash, parentTraceHash, block.timestamp);
+        }
 
         emit TraceAnchored(
             traceHash,
@@ -540,6 +634,83 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
 
     function getCreatorTraceCount(address creator) external view returns (uint256) {
         return creatorAnchors[creator].length;
+    }
+
+    // ============ Trace Linking View Functions ============
+
+    /**
+     * @notice Get the parent trace hash for a given trace
+     * @param traceHash The trace to query
+     * @return parentHash The parent trace hash (0x0 if root)
+     * @return hasParent True if trace has a parent
+     */
+    function getParentTrace(bytes32 traceHash) external view returns (bytes32 parentHash, bool hasParent) {
+        if (anchors[traceHash].timestamp == 0) {
+            revert AnchorNotFound(traceHash);
+        }
+        bytes32 parent = anchors[traceHash].parentTraceHash;
+        return (parent, parent != bytes32(0));
+    }
+
+    /**
+     * @notice Get all child traces for a given parent
+     * @param parentTraceHash The parent trace to query
+     * @return childHashes Array of child trace hashes
+     * @dev DEPRECATED: Use getChildTracesPaginated for large datasets
+     */
+    function getChildTraces(bytes32 parentTraceHash) external view returns (bytes32[] memory childHashes) {
+        return childTraces[parentTraceHash];
+    }
+
+    /**
+     * @notice Get paginated child traces for a given parent
+     * @param parentTraceHash The parent trace to query
+     * @param offset Starting index
+     * @param limit Maximum results to return
+     * @return childHashes Array of child trace hashes
+     * @return total Total number of children
+     */
+    function getChildTracesPaginated(
+        bytes32 parentTraceHash,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory childHashes, uint256 total) {
+        bytes32[] storage allChildren = childTraces[parentTraceHash];
+        total = allChildren.length;
+
+        if (offset >= total) {
+            return (new bytes32[](0), total);
+        }
+
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        uint256 resultLength = end - offset;
+
+        childHashes = new bytes32[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            childHashes[i] = allChildren[offset + i];
+        }
+    }
+
+    /**
+     * @notice Get the count of child traces
+     * @param parentTraceHash The parent trace to query
+     * @return count Number of children
+     */
+    function getChildTraceCount(bytes32 parentTraceHash) external view returns (uint256 count) {
+        return childTraces[parentTraceHash].length;
+    }
+
+    /**
+     * @notice Check if a trace is a root trace (no parent)
+     * @param traceHash The trace to check
+     * @return isRoot True if trace has no parent
+     */
+    function isRootTrace(bytes32 traceHash) external view returns (bool isRoot) {
+        if (anchors[traceHash].timestamp == 0) {
+            revert AnchorNotFound(traceHash);
+        }
+        return anchors[traceHash].parentTraceHash == bytes32(0);
     }
 
     // ============ Admin Functions ============
