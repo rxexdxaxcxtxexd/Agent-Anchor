@@ -38,6 +38,94 @@ const result = await client.anchorTrace(trace);
 console.log('Anchored:', result.traceHash);
 ```
 
+## Runtime Wrapper (Zero-Code Tracing)
+
+The Runtime Wrapper enables automatic trace anchoring for any AI agent with a single line of code. No modifications to your existing agent code required.
+
+### Basic Usage
+
+```typescript
+import { AgentAnchorRuntime } from '@agent-anchor/sdk/runtime';
+
+// Your existing agent (unchanged)
+const myAgent = new MyAIAgent();
+
+// Wrap it with one line
+const wrapped = await AgentAnchorRuntime.wrap(myAgent, {
+  privateKey: process.env.AGENT_ANCHOR_KEY,
+});
+
+// Use wrapped.agent exactly like your original agent
+// All method calls are now automatically traced and anchored
+const result = await wrapped.agent.makeDecision(userInput);
+```
+
+### Consistency Modes
+
+Choose how strictly anchoring is enforced:
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| `sync` (default) | Halts on anchor failure | Compliance-critical deployments |
+| `async` | Anchors in background | Fast iteration, eventual consistency |
+| `cache` | Batches anchors periodically | High-throughput, cost efficiency |
+| `two-phase` | Local signing + async chain write | Balance of speed and evidence |
+
+```typescript
+const wrapped = await AgentAnchorRuntime.wrap(myAgent, {
+  privateKey: key,
+  consistencyMode: 'async',  // or 'sync', 'cache', 'two-phase'
+});
+```
+
+### Sensitive Data Redaction
+
+Automatically redact PII before anchoring:
+
+```typescript
+const wrapped = await AgentAnchorRuntime.wrap(myAgent, {
+  privateKey: key,
+  redaction: {
+    enabled: true,
+    builtins: true,  // SSN, credit cards, API keys
+    patterns: [
+      { name: 'custom-id', pattern: /INTERNAL_\w+/g },
+    ],
+  },
+});
+```
+
+### Monitoring Callbacks
+
+Track anchor status in real-time:
+
+```typescript
+const wrapped = await AgentAnchorRuntime.wrap(myAgent, {
+  privateKey: key,
+  callbacks: {
+    onActionCaptured: (entry) => console.log(`Captured: ${entry.method}`),
+    onAnchorConfirmed: (record, receipt) => console.log(`Block: ${receipt.blockNumber}`),
+    onAnchorFailed: (record, error) => console.error(`Failed: ${error.message}`),
+  },
+});
+```
+
+### Wallet Connection (Browser)
+
+For blockchain-native users:
+
+```typescript
+// Connect MetaMask
+await AgentAnchorRuntime.connectWallet({ type: 'injected' });
+
+// Then wrap without privateKey
+const wrapped = await AgentAnchorRuntime.wrap(myAgent, {
+  consistencyMode: 'sync',
+});
+```
+
+For the complete Runtime Wrapper guide, see [specs/002-runtime-wrapper/quickstart.md](../../specs/002-runtime-wrapper/quickstart.md).
+
 ## Security Considerations
 
 ### Permissionless Design

@@ -70,6 +70,9 @@ contract AgentAnchor is Ownable {
     /// @notice Mapping from parent trace hash to array of child trace hashes
     mapping(bytes32 => bytes32[]) public childTraces;
 
+    /// @notice Mapping from child trace hash to parent trace hash (for reverse lookup)
+    mapping(bytes32 => bytes32) public parentTraces;
+
     // ============ Events ============
 
     /**
@@ -286,9 +289,10 @@ contract AgentAnchor is Ownable {
         creatorAnchors[msg.sender].push(traceHash);
         totalAnchors++;
 
-        // Update child index if parent specified (T017)
+        // Update child and parent indexes if parent specified (T017)
         if (parentTraceHash != bytes32(0)) {
             childTraces[parentTraceHash].push(traceHash);
+            parentTraces[traceHash] = parentTraceHash;  // Store parent for reverse lookup
             // Emit link event (T018)
             emit TraceLinked(traceHash, parentTraceHash, block.timestamp);
         }
@@ -458,14 +462,13 @@ contract AgentAnchor is Ownable {
      * @param traceHash The trace to query
      * @return parentHash The parent trace hash (0x0 if root)
      * @return hasParent True if trace has a parent
-     * @dev V1 does not store parentTraceHash in Anchor struct, returns (0, false)
      */
     function getParentTrace(bytes32 traceHash) external view returns (bytes32 parentHash, bool hasParent) {
         if (anchors[traceHash].timestamp == 0) {
             revert AnchorNotFound(traceHash);
         }
-        // V1 doesn't store parent in Anchor struct - use V2 for parent lookup
-        return (bytes32(0), false);
+        bytes32 parent = parentTraces[traceHash];
+        return (parent, parent != bytes32(0));
     }
 
     /**
@@ -521,13 +524,12 @@ contract AgentAnchor is Ownable {
      * @notice Check if a trace is a root trace (no parent)
      * @param traceHash The trace to check
      * @return isRoot True if trace has no parent
-     * @dev V1 always returns true since parentTraceHash not stored in Anchor
      */
     function isRootTrace(bytes32 traceHash) external view returns (bool isRoot) {
         if (anchors[traceHash].timestamp == 0) {
             revert AnchorNotFound(traceHash);
         }
-        return true;
+        return parentTraces[traceHash] == bytes32(0);
     }
 
     // ============ Admin Functions ============

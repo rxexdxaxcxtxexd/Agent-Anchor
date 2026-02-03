@@ -184,6 +184,11 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
             revert NotAllowed(msg.sender);
         }
 
+        // SEC: Enforce identity requirement if enabled
+        if (identityRequired) {
+            revert IdentityRequired();
+        }
+
         if (traceHash == bytes32(0)) revert InvalidTraceHash();
         if (bytes(ipfsUri).length == 0) revert InvalidIpfsUri();
         if (bytes(ipfsUri).length > MAX_IPFS_URI_LENGTH) {
@@ -241,6 +246,11 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
     ) external returns (bool success) {
         if (!permissionless && !allowlist[msg.sender]) {
             revert NotAllowed(msg.sender);
+        }
+
+        // SEC: Enforce identity requirement if enabled
+        if (identityRequired) {
+            revert IdentityRequired();
         }
 
         if (traceHash == bytes32(0)) revert InvalidTraceHash();
@@ -342,11 +352,12 @@ contract AgentAnchorV2 is Ownable, IIdentityBinding, IGitMetadata, IAuthorship, 
     /**
      * @notice Bind identity to a trace using EIP-712 signature
      * @dev The signature must be created with the exact parameters provided
+     * @dev Only the original trace creator can bind identity to prevent attribution theft
      */
     function bindIdentity(
         bytes32 traceHash,
         bytes calldata signature
-    ) external override traceExists(traceHash) returns (bool success) {
+    ) external override onlyTraceCreator(traceHash) returns (bool success) {
         if (identityBindings[traceHash].verified) {
             revert IdentityAlreadyBound(traceHash);
         }

@@ -103,14 +103,13 @@ describe("TraceLinking", function () {
       const exists = await agentAnchor.anchorExists(childTraceData.traceHash);
       expect(exists).to.be.true;
 
-      // V1 Note: getParentTrace always returns (0, false) in V1 because parentTraceHash
-      // is not stored in the Anchor struct (for backward compatibility). Use V2 for
-      // parent lookup capability. V1 only supports child lookup via getChildTraces.
+      // V1 now supports parent lookup via the parentTraces mapping
       const [parentHash, hasParent] = await (agentAnchor as any).getParentTrace(
         childTraceData.traceHash
       );
-      // V1 limitation: hasParent is always false
-      expect(hasParent).to.be.false;
+      // V1 now returns the correct parent hash
+      expect(hasParent).to.be.true;
+      expect(parentHash).to.equal(parentTraceData.traceHash);
 
       // Verify child is in parent's children list
       // NOTE: This requires getChildTraces implementation (T018)
@@ -294,16 +293,14 @@ describe("TraceLinking", function () {
         parentTraceData.traceHash
       );
 
-      // Query parent trace
-      // V1 Note: getParentTrace always returns (0, false) in V1
-      // because parentTraceHash is not stored in the Anchor struct
+      // Query parent trace - V1 now supports parent lookup via parentTraces mapping
       const [parentHash, hasParent] = await (agentAnchor as any).getParentTrace(
         childTraceData.traceHash
       );
 
-      // V1 limitation: hasParent is always false, parent lookup not supported
-      expect(hasParent).to.be.false;
-      expect(parentHash).to.equal(ethers.ZeroHash);
+      // V1 now returns the correct parent hash
+      expect(hasParent).to.be.true;
+      expect(parentHash).to.equal(parentTraceData.traceHash);
     });
 
     /**
@@ -473,9 +470,7 @@ describe("TraceLinking", function () {
         parentTraceData.traceHash
       );
 
-      // Verify root trace identification
-      // NOTE: In V1, isRootTrace always returns true because V1 doesn't store
-      // parentTraceHash in the Anchor struct. Use V2 for full parent tracking.
+      // Verify root trace identification - V1 now correctly tracks parent relationships
       const isRootTraceRoot = await (agentAnchor as any).isRootTrace(
         rootTrace.traceHash
       );
@@ -484,8 +479,8 @@ describe("TraceLinking", function () {
       const isRootTraceChild = await (agentAnchor as any).isRootTrace(
         childTrace.traceHash
       );
-      // V1 limitation: always returns true (parent not stored in Anchor)
-      expect(isRootTraceChild).to.be.true;
+      // V1 now correctly returns false for child traces
+      expect(isRootTraceChild).to.be.false;
     });
   });
 
